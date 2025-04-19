@@ -1,14 +1,17 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { SequelizeModule } from '@nestjs/sequelize';
-import { APP_FILTER } from '@nestjs/core';
+import { APP_FILTER, APP_GUARD } from '@nestjs/core';
 import { HttpExceptionFilter } from './common/filters/http-exception.filter';
 import { UserModule } from './modules/user/user.module';
 import { AuthModule } from './modules/auth/auth.module';
 import { CommonModule } from './common/common.module';
 import { HealthModule } from './modules/health/health.module';
 import { MailModule } from './modules/mail/mail.module';
+import { AppController } from './app.controller';
 import configuration from './config/configuration';
+import { JwtAuthGuard } from './modules/auth/guards/jwt-auth.guard';
+import { AdminUserSeeder } from './modules/user/admin-user-seeder';
 
 @Module({
   imports: [
@@ -42,11 +45,28 @@ import configuration from './config/configuration';
     HealthModule,
     MailModule,
   ],
+  controllers: [AppController],
   providers: [
     {
       provide: APP_FILTER,
       useClass: HttpExceptionFilter,
     },
+    {
+      provide: APP_GUARD,
+      useClass: JwtAuthGuard,
+    },
   ],
 })
-export class AppModule {} 
+export class AppModule {
+  constructor(private readonly adminUserSeeder: AdminUserSeeder) {
+    this.seedDatabase();
+  }
+
+  private async seedDatabase() {
+    try {
+      await this.adminUserSeeder.seed();
+    } catch (error) {
+      console.error('Error seeding database:', error);
+    }
+  }
+} 

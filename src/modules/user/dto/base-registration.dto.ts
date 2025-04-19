@@ -1,28 +1,27 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { IsEmail, IsEnum, IsOptional, IsPhoneNumber, IsString, Matches, MinLength } from 'class-validator';
-import { UserRole, UserStatus } from '../entities/user.entity';
+import { IsEmail, IsNotEmpty, IsString, MinLength, Matches, IsBoolean, IsOptional, IsPhoneNumber } from 'class-validator';
 
-export class UpdateUserDto {
+export class BaseRegistrationDto {
   @ApiProperty({ example: 'John', description: 'First name' })
-  @IsOptional()
+  @IsNotEmpty({ message: 'First name is required' })
   @IsString({ message: 'First name must be a string' })
-  firstName?: string;
+  firstName: string;
 
   @ApiProperty({ example: 'Doe', description: 'Last name' })
-  @IsOptional()
+  @IsNotEmpty({ message: 'Last name is required' })
   @IsString({ message: 'Last name must be a string' })
-  lastName?: string;
+  lastName: string;
 
   @ApiProperty({ example: 'johndoe', description: 'Username' })
-  @IsOptional()
+  @IsNotEmpty({ message: 'Username is required' })
   @IsString({ message: 'Username must be a string' })
   @Matches(/^[a-zA-Z0-9_-]+$/, { message: 'Username can only contain letters, numbers, underscores, and hyphens' })
-  username?: string;
+  username: string;
 
   @ApiProperty({ example: 'john.doe@example.com', description: 'Email address' })
-  @IsOptional()
+  @IsNotEmpty({ message: 'Email is required' })
   @IsEmail({}, { message: 'Invalid email format' })
-  email?: string;
+  email: string;
 
   @ApiProperty({ example: '+1234567890', description: 'Phone number' })
   @IsOptional()
@@ -30,20 +29,15 @@ export class UpdateUserDto {
   phoneNumber?: string;
 
   @ApiProperty({ example: 'Password123!', description: 'Password' })
-  @IsOptional()
+  @IsNotEmpty({ message: 'Password is required' })
   @MinLength(8, { message: 'Password must be at least 8 characters long' })
   @Matches(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]/, {
     message: 'Password must contain at least one uppercase letter, one lowercase letter, one number, and one special character',
   })
-  password?: string;
+  password: string;
 
-  @ApiProperty({ enum: UserRole, example: UserRole.CANDIDATE, description: 'User role' })
-  @IsOptional()
-  @IsEnum(UserRole, { message: 'Invalid role' })
-  role?: UserRole;
-
-  @ApiProperty({ enum: UserStatus, example: UserStatus.ACTIVE, description: 'User status' })
-  @IsOptional()
-  @IsEnum(UserStatus, { message: 'Invalid status' })
-  status?: UserStatus;
+  @ApiProperty({ example: true, description: 'Terms acceptance' })
+  @IsBoolean({ message: 'Terms acceptance must be a boolean' })
+  @IsNotEmpty({ message: 'Terms acceptance is required' })
+  termsAccepted: boolean;
 } 

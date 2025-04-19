@@ -1,9 +1,13 @@
-import { Controller, Post, Body, HttpCode, HttpStatus, Get } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiResponse } from '@nestjs/swagger';
+import { Controller, Post, Body, HttpCode, HttpStatus, Get, UseGuards } from '@nestjs/common';
+import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
 import { successResponse } from '../../common/helpers/response.helper';
 import { SendTestEmailDto, SendNotificationEmailDto } from './dto/send-test-email.dto';
 import { MailService } from './mail.service';
 import { ConfigService } from '@nestjs/config';
+import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { RolesGuard } from '../auth/guards/roles.guard';
+import { Roles } from '../auth/decorators/roles.decorator';
+import { UserRole } from '../user/entities/user.entity';
 
 @ApiTags('Mail')
 @Controller('mail')
@@ -30,31 +34,52 @@ export class MailController {
   }
 
   @Post('test')
-  @HttpCode(HttpStatus.OK)
-  @ApiOperation({ summary: 'Send a test email' })
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.ADMIN)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Send a test email (Admin only)' })
   @ApiResponse({ 
     status: 200, 
     description: 'Test email sent successfully',
   })
-  async sendTestEmail(@Body() sendTestEmailDto: SendTestEmailDto) {
-    const { email, name = 'User' } = sendTestEmailDto;
+  async sendTestEmail(@Body() body: { email: string }) {
+    const { email } = body;
     const result = await this.mailService.sendTestEmail(email);
     
-    return successResponse({ success: result }, 'Test email sent');
+    if (result) {
+      return successResponse(null, 'Test email sent successfully');
+    } else {
+      return successResponse(null, 'Failed to send test email');
+    }
   }
 
   @Post('welcome')
-  @HttpCode(HttpStatus.OK)
-  @ApiOperation({ summary: 'Send a welcome email' })
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.ADMIN)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Send a welcome email (Admin only)' })
   @ApiResponse({ 
     status: 200, 
     description: 'Welcome email sent successfully',
   })
-  async sendWelcomeEmail(@Body() sendTestEmailDto: SendTestEmailDto) {
-    const { email, name = 'User' } = sendTestEmailDto;
-    const result = await this.mailService.sendWelcomeEmail(email, name);
+  async sendWelcomeEmail(@Body() body: { email: string; name: string }) {
+    const { email, name } = body;
     
-    return successResponse({ success: result }, 'Welcome email sent');
+    // Create a mock user object with the required properties
+    const mockUser = {
+      email,
+      firstName: name,
+      role: 'user',
+      status: 'active'
+    };
+    
+    const result = await this.mailService.sendWelcomeEmail(mockUser);
+    
+    if (result) {
+      return successResponse(null, 'Welcome email sent successfully');
+    } else {
+      return successResponse(null, 'Failed to send welcome email');
+    }
   }
 
   @Post('notification')

@@ -1,0 +1,158 @@
+import { Column, Model, Table, DataType, BeforeCreate, BeforeUpdate } from 'sequelize-typescript';
+import * as bcrypt from 'bcrypt';
+import { ApiProperty } from '@nestjs/swagger';
+
+export enum UserRole {
+  ADMIN = 'admin',
+  CANDIDATE = 'candidate',
+  EMPLOYER = 'employer'
+}
+
+export enum UserStatus {
+  ACTIVE = 'active',
+  INACTIVE = 'inactive',
+  SUSPENDED = 'suspended'
+}
+
+@Table({
+  tableName: 'users',
+  timestamps: true
+})
+export class User extends Model {
+  @ApiProperty({ example: 1, description: 'Unique identifier' })
+  @Column({
+    primaryKey: true,
+    autoIncrement: true,
+    type: DataType.INTEGER
+  })
+  id: number;
+
+  @ApiProperty({ example: 'John', description: 'First name' })
+  @Column({
+    type: DataType.STRING,
+    allowNull: false
+  })
+  firstName: string;
+
+  @ApiProperty({ example: 'Doe', description: 'Last name' })
+  @Column({
+    type: DataType.STRING,
+    allowNull: false
+  })
+  lastName: string;
+
+  @ApiProperty({ example: 'johndoe', description: 'Username' })
+  @Column({
+    type: DataType.STRING,
+    allowNull: false,
+    unique: true
+  })
+  username: string;
+
+  @ApiProperty({ example: 'john.doe@example.com', description: 'Email address' })
+  @Column({
+    type: DataType.STRING,
+    allowNull: false,
+    unique: true
+  })
+  email: string;
+
+  @ApiProperty({ example: '+1234567890', description: 'Phone number' })
+  @Column({
+    type: DataType.STRING,
+    allowNull: true
+  })
+  phoneNumber: string;
+
+  @Column({
+    type: DataType.STRING,
+    allowNull: false
+  })
+  password: string;
+
+  @ApiProperty({ enum: UserRole, example: UserRole.CANDIDATE, description: 'User role' })
+  @Column({
+    type: DataType.ENUM(...Object.values(UserRole)),
+    allowNull: false,
+    defaultValue: UserRole.CANDIDATE
+  })
+  role: UserRole;
+
+  @ApiProperty({ enum: UserStatus, example: UserStatus.INACTIVE, description: 'User status' })
+  @Column({
+    type: DataType.ENUM(...Object.values(UserStatus)),
+    allowNull: false,
+    defaultValue: UserStatus.INACTIVE
+  })
+  status: UserStatus;
+
+  @ApiProperty({ example: 'path/to/student-permit.jpg', description: 'Student permit image path' })
+  @Column({
+    type: DataType.STRING,
+    allowNull: true
+  })
+  studentPermitImage: string;
+
+  @ApiProperty({ example: 'path/to/enrollment-proof.jpg', description: 'Proof of enrollment image path' })
+  @Column({
+    type: DataType.STRING,
+    allowNull: true
+  })
+  proofOfEnrollmentImage: string;
+
+  @ApiProperty({ example: true, description: 'Terms acceptance' })
+  @Column({
+    type: DataType.BOOLEAN,
+    allowNull: false,
+    defaultValue: false
+  })
+  termsAccepted: boolean;
+
+  @ApiProperty({ example: '2023-01-01T00:00:00Z', description: 'Account creation date' })
+  @Column({
+    type: DataType.DATE,
+    allowNull: false,
+    defaultValue: DataType.NOW
+  })
+  createdAt: Date;
+
+  @ApiProperty({ example: '2023-01-01T00:00:00Z', description: 'Account last update date' })
+  @Column({
+    type: DataType.DATE,
+    allowNull: false,
+    defaultValue: DataType.NOW
+  })
+  updatedAt: Date;
+
+  @ApiProperty({ example: null, description: 'Account deletion date' })
+  @Column({
+    type: DataType.DATE,
+    allowNull: true
+  })
+  deletedAt: Date;
+
+  @Column({
+    type: DataType.BOOLEAN,
+    defaultValue: false,
+  })
+  emailVerified: boolean;
+
+  @BeforeCreate
+  @BeforeUpdate
+  static async hashPassword(instance: User) {
+    // Only hash the password if it has been modified
+    if (instance.changed('password')) {
+      const salt = await bcrypt.genSalt();
+      instance.password = await bcrypt.hash(instance.password, salt);
+    }
+  }
+
+  async comparePassword(password: string): Promise<boolean> {
+    return bcrypt.compare(password, this.password);
+  }
+
+  // Helper method to get full name
+  get fullName(): string {
+    return `${this.firstName} ${this.lastName}`;
+  }
+} 

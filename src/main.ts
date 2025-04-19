@@ -17,28 +17,31 @@ if (fs.existsSync('.env.local')) {
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
   
-  // Set global prefix for all routes
-  app.setGlobalPrefix('api/v1');
-  
   // Enable CORS
   app.enableCors();
   
-  // Use Helmet for secure HTTP headers
+  // Use Helmet for security headers
   app.use(helmet());
   
-  // Apply global validation pipe
+  // Enable validation
   app.useGlobalPipes(
     new ValidationPipe({
       whitelist: true,
       transform: true,
       forbidNonWhitelisted: true,
+      transformOptions: {
+        enableImplicitConversion: true,
+      },
     }),
   );
+  
+  // Set global prefix
+  app.setGlobalPrefix('api/v1');
   
   // Setup Swagger
   const config = new DocumentBuilder()
     .setTitle('JobTowners API')
-    .setDescription('The JobTowners API documentation')
+    .setDescription('JobTowners API Documentation')
     .setVersion('1.0')
     .addBearerAuth()
     .build();

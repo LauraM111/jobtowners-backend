@@ -4,13 +4,19 @@
  * @param message - Optional success message
  * @returns Formatted success response
  */
-export const successResponse = (data: any, message?: string) => {
+export interface ApiResponse<T> {
+  success: boolean;
+  message: string;
+  data: T | null;
+}
+
+export function successResponse<T>(data: T, message = 'Success'): ApiResponse<T> {
   return {
     success: true,
-    message: message || 'Operation successful',
+    message,
     data,
   };
-};
+}
 
 /**
  * Standard error response format
@@ -18,10 +24,10 @@ export const successResponse = (data: any, message?: string) => {
  * @param error - Optional error details
  * @returns Formatted error response
  */
-export const errorResponse = (message: string, error?: any) => {
+export function errorResponse(message = 'Error', data: any = null): ApiResponse<any> {
   return {
     success: false,
     message,
-    error: error || null,
+    data,
   };
-}; 
+} 
