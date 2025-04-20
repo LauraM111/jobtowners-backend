@@ -12,6 +12,8 @@ import { AppController } from './app.controller';
 import configuration from './config/configuration';
 import { JwtAuthGuard } from './modules/auth/guards/jwt-auth.guard';
 import { AdminUserSeeder } from './modules/user/admin-user-seeder';
+import { getDatabaseConfig } from './config/database.config';
+import { UploadModule } from './modules/upload/upload.module';
 
 @Module({
   imports: [
@@ -25,17 +27,7 @@ import { AdminUserSeeder } from './modules/user/admin-user-seeder';
     SequelizeModule.forRootAsync({
       imports: [ConfigModule],
       inject: [ConfigService],
-      useFactory: (configService: ConfigService) => ({
-        dialect: 'mysql',
-        host: configService.get('database.host'),
-        port: configService.get('database.port'),
-        username: configService.get('database.username'),
-        password: configService.get('database.password'),
-        database: configService.get('database.name'),
-        autoLoadModels: true,
-        synchronize: configService.get('database.synchronize'),
-        logging: configService.get('database.logging'),
-      }),
+      useFactory: getDatabaseConfig,
     }),
     
     // Modules
@@ -44,6 +36,7 @@ import { AdminUserSeeder } from './modules/user/admin-user-seeder';
     CommonModule,
     HealthModule,
     MailModule,
+    UploadModule,
   ],
   controllers: [AppController],
   providers: [

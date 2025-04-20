@@ -1,8 +1,9 @@
 import { Injectable, Logger, NotFoundException, BadRequestException, Inject, forwardRef } from '@nestjs/common';
 import { InjectModel } from '@nestjs/sequelize';
-import { OTP } from './entities/otp.entity';
+import OTP from './entities/otp.entity';
 import { User } from '../user/entities/user.entity';
 import { MailService } from '../mail/mail.service';
+import { UserService } from '../user/user.service';
 
 @Injectable()
 export class OtpService {
@@ -11,8 +12,8 @@ export class OtpService {
   constructor(
     @InjectModel(OTP)
     private otpModel: typeof OTP,
-    @InjectModel(User)
-    private userModel: typeof User,
+    @Inject(forwardRef(() => UserService))
+    private userService: UserService,
     private mailService: MailService,
   ) {}
 
@@ -26,51 +27,26 @@ export class OtpService {
   /**
    * Create a new OTP for a user
    */
-  async createOtp(userId: number): Promise<OTP> {
-    // Check if user exists
-    const user = await this.userModel.findByPk(userId);
-    if (!user) {
-      throw new NotFoundException(`User with ID ${userId} not found`);
-    }
-
-    // Generate OTP code
-    const code = this.generateOtpCode();
+  async createOtp(user: User, expiresInMinutes: number = 10): Promise<OTP> {
+    // Generate a random 6-digit code
+    const code = Math.floor(100000 + Math.random() * 900000).toString();
     
-    // Set expiration time (15 minutes from now)
+    // Calculate expiration time
     const expiresAt = new Date();
-    expiresAt.setMinutes(expiresAt.getMinutes() + 15);
-
-    // Delete any existing unused OTPs for this user
-    await this.otpModel.destroy({
-      where: {
-        userId,
-        used: false,
-      },
-    });
-
-    // Create new OTP
-    const otp = await this.otpModel.create({
+    expiresAt.setMinutes(expiresAt.getMinutes() + expiresInMinutes);
+    
+    // Create and save the OTP using the user's ID
+    return this.otpModel.create({
       code,
-      userId,
       expiresAt,
-      used: false,
+      userId: user.id,
     });
-
-    // Send OTP email
-    try {
-      await this.mailService.sendOtpEmail(user, code);
-    } catch (error) {
-      this.logger.error(`Failed to send OTP email: ${error.message}`, error.stack);
-      // Continue even if email fails
-    }
-
-    return otp;
   }
 
   /**
    * Verify an OTP code
    */
-  async verifyOtp(userId: number, code: string): Promise<boolean> {
+  async verifyOtp(userId: string, code: string): Promise<boolean> {
     // Find the OTP
     const otp = await this.otpModel.findOne({
       where: {
@@ -95,7 +71,7 @@ export class OtpService {
     await otp.save();
 
     // Update user's email verification status
-    const user = await this.userModel.findByPk(userId);
+    const user = await this.userService.findOne(userId);
     user.emailVerified = true;
     await user.save();
 
@@ -105,7 +81,11 @@ export class OtpService {
   /**
    * Resend OTP to user
    */
-  async resendOtp(userId: number): Promise<OTP> {
-    return this.createOtp(userId);
+  async resendOtp(userId: string): Promise<OTP> {
+    // Find the user first
+    const user = await this.userService.findOne(userId);
+    
+    // Pass the user object to createOtp
+    return this.createOtp(user);
   }
 } 

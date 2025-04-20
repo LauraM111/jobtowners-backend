@@ -1,17 +1,19 @@
-import { Module } from '@nestjs/common';
+import { Module, forwardRef } from '@nestjs/common';
 import { SequelizeModule } from '@nestjs/sequelize';
 import { UserController } from './user.controller';
 import { UserService } from './user.service';
 import { User } from './entities/user.entity';
 import { MailModule } from '../mail/mail.module';
 import { AdminUserSeeder } from './admin-user-seeder';
-import { OtpModule } from '../auth/otp.module';
+import { AuthModule } from '../auth/auth.module';
+import { UploadModule } from '../upload/upload.module';
 
 @Module({
   imports: [
     SequelizeModule.forFeature([User]),
     MailModule,
-    OtpModule,
+    forwardRef(() => AuthModule),
+    UploadModule,
   ],
   controllers: [UserController],
   providers: [UserService, AdminUserSeeder],

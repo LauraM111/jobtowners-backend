@@ -1,33 +1,52 @@
-import { Table, Column, Model, DataType, ForeignKey, BelongsTo } from 'sequelize-typescript';
+import { Column, Model, Table, DataType, ForeignKey, BelongsTo, BeforeCreate } from 'sequelize-typescript';
+import { v4 as uuidv4 } from 'uuid';
 import { User } from '../../user/entities/user.entity';
 
-@Table
-export class OTP extends Model {
+@Table({
+  tableName: 'otps',
+  timestamps: true
+})
+export default class OTP extends Model {
+  @Column({
+    type: DataType.STRING(36),
+    primaryKey: true,
+    defaultValue: DataType.UUIDV4
+  })
+  id: string;
+
   @Column({
     type: DataType.STRING,
-    allowNull: false,
+    allowNull: false
   })
   code: string;
 
-  @ForeignKey(() => User)
-  @Column({
-    type: DataType.INTEGER,
-    allowNull: false,
-  })
-  userId: number;
-
-  @BelongsTo(() => User)
-  user: User;
-
   @Column({
     type: DataType.DATE,
-    allowNull: false,
+    allowNull: false
   })
   expiresAt: Date;
 
   @Column({
     type: DataType.BOOLEAN,
     defaultValue: false,
+    field: 'used'
   })
   used: boolean;
+
+  @ForeignKey(() => User)
+  @Column({
+    type: DataType.STRING(36),
+    allowNull: false
+  })
+  userId: string;
+
+  @BelongsTo(() => User)
+  user: User;
+
+  @BeforeCreate
+  static generateId(instance: OTP) {
+    if (!instance.id) {
+      instance.id = uuidv4();
+    }
+  }
 } 

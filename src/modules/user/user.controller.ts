@@ -12,6 +12,7 @@ import {
   HttpStatus,
   ConflictException,
   BadRequestException,
+  Patch,
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiParam, ApiBearerAuth } from '@nestjs/swagger';
 import { UserService } from './user.service';
@@ -226,12 +227,11 @@ export class UserController {
   })
   @ApiResponse({ status: 404, description: 'User not found.' })
   async findOne(@Param('id') id: string) {
-    const user = await this.userService.findOne(+id);
-    const { password, ...result } = user.toJSON();
-    return successResponse(result, 'User retrieved successfully');
+    const user = await this.userService.findOne(id);
+    return user;
   }
 
-  @Put(':id')
+  @Patch(':id')
   @ApiOperation({ summary: 'Update a user' })
   @ApiParam({ name: 'id', description: 'User ID' })
   @ApiResponse({ 
@@ -242,12 +242,9 @@ export class UserController {
   @ApiResponse({ status: 400, description: 'Bad request.' })
   @ApiResponse({ status: 404, description: 'User not found.' })
   @ApiResponse({ status: 409, description: 'User with this email already exists.' })
-  async update(
-    @Param('id', ParseIntPipe) id: number,
-    @Body() updateUserDto: UpdateUserDto,
-  ) {
+  async update(@Param('id') id: string, @Body() updateUserDto: UpdateUserDto) {
     const user = await this.userService.update(id, updateUserDto);
-    return successResponse(user, 'User updated successfully');
+    return user;
   }
 
   @Delete(':id')
@@ -259,8 +256,8 @@ export class UserController {
   @ApiResponse({ status: 204, description: 'The user has been successfully deleted.' })
   @ApiResponse({ status: 404, description: 'User not found.' })
   async remove(@Param('id') id: string) {
-    await this.userService.remove(+id);
-    return successResponse(null, 'User deleted successfully');
+    await this.userService.remove(id);
+    return { message: 'User deleted successfully' };
   }
 
   @Get(':id/email-verification-status')
@@ -272,10 +269,16 @@ export class UserController {
     description: 'Email verification status',
   })
   @ApiResponse({ status: 404, description: 'User not found' })
-  async checkEmailVerificationStatus(@Param('id', ParseIntPipe) id: number) {
+  async checkEmailVerificationStatus(@Param('id') id: string) {
     const user = await this.userService.findOne(id);
     return successResponse({ 
       verified: user.emailVerified 
     }, 'Email verification status retrieved successfully');
+  }
+
+  @Get(':id/profile')
+  async getUserProfile(@Param('id') id: string) {
+    const user = await this.userService.findOne(id);
+    return user;
   }
 } 

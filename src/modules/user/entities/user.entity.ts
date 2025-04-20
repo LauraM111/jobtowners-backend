@@ -1,6 +1,7 @@
 import { Column, Model, Table, DataType, BeforeCreate, BeforeUpdate } from 'sequelize-typescript';
 import * as bcrypt from 'bcrypt';
 import { ApiProperty } from '@nestjs/swagger';
+import { v4 as uuidv4 } from 'uuid';
 
 export enum UserRole {
   ADMIN = 'admin',
@@ -21,23 +22,23 @@ export enum UserStatus {
 export class User extends Model {
   @ApiProperty({ example: 1, description: 'Unique identifier' })
   @Column({
+    type: DataType.STRING(36),
     primaryKey: true,
-    autoIncrement: true,
-    type: DataType.INTEGER
+    defaultValue: DataType.UUIDV4
   })
-  id: number;
+  id: string;
 
   @ApiProperty({ example: 'John', description: 'First name' })
   @Column({
     type: DataType.STRING,
-    allowNull: false
+    allowNull: true
   })
   firstName: string;
 
   @ApiProperty({ example: 'Doe', description: 'Last name' })
   @Column({
     type: DataType.STRING,
-    allowNull: false
+    allowNull: true
   })
   lastName: string;
 
@@ -154,5 +155,12 @@ export class User extends Model {
   // Helper method to get full name
   get fullName(): string {
     return `${this.firstName} ${this.lastName}`;
+  }
+
+  @BeforeCreate
+  static generateId(instance: User) {
+    if (!instance.id) {
+      instance.id = uuidv4();
+    }
   }
 } 

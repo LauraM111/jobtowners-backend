@@ -1,14 +1,13 @@
-import { IsString, IsNotEmpty, Length, IsNumber, IsInt } from 'class-validator';
+import { IsString, IsNotEmpty, Length, IsNumber, IsInt, IsUUID } from 'class-validator';
 import { ApiProperty } from '@nestjs/swagger';
 
 export class VerifyOtpDto {
   @ApiProperty({
     description: 'User ID',
-    example: 1,
+    example: '123e4567-e89b-12d3-a456-426614174000',
   })
-  @IsInt()
-  @IsNotEmpty()
-  userId: number;
+  @IsUUID()
+  userId: string;
 
   @ApiProperty({
     description: 'OTP code',
@@ -23,9 +22,8 @@ export class VerifyOtpDto {
 export class ResendOtpDto {
   @ApiProperty({
     description: 'User ID',
-    example: 1,
+    example: '123e4567-e89b-12d3-a456-426614174000',
   })
-  @IsInt()
-  @IsNotEmpty()
-  userId: number;
+  @IsUUID()
+  userId: string;
 } 

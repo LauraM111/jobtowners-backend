@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException, ConflictException, BadRequestException, Logger } from '@nestjs/common';
+import { Injectable, NotFoundException, ConflictException, BadRequestException, Logger, Inject, forwardRef } from '@nestjs/common';
 import { InjectModel } from '@nestjs/sequelize';
 import * as bcrypt from 'bcrypt';
 import { User, UserRole, UserStatus } from './entities/user.entity';
@@ -11,6 +11,7 @@ import { MailService } from '../mail/mail.service';
 import * as fs from 'fs';
 import * as path from 'path';
 import { OtpService } from '../auth/otp.service';
+import { UploadService } from '../upload/upload.service';
 
 @Injectable()
 export class UserService {
@@ -20,38 +21,34 @@ export class UserService {
     @InjectModel(User)
     private userModel: typeof User,
     private mailService: MailService,
-    private otpService: OtpService
+    @Inject(forwardRef(() => OtpService))
+    private otpService: OtpService,
+    private uploadService: UploadService,
   ) {}
 
   /**
    * Create a new user
    */
   async create(createUserDto: CreateUserDto): Promise<User> {
-    // Check if user with email already exists
-    const existingUserByEmail = await this.userModel.findOne({
-      where: { email: createUserDto.email }
+    const { email, password } = createUserDto;
+    
+    // Check if user already exists
+    const existingUser = await this.userModel.findOne({ 
+      where: { email } 
     });
-
-    if (existingUserByEmail) {
-      throw new ConflictException('User with this email already exists');
+    
+    if (existingUser) {
+      throw new ConflictException('Email already exists');
     }
-
-    // Check if user with username already exists
-    const existingUserByUsername = await this.userModel.findOne({
-      where: { username: createUserDto.username }
-    });
-
-    if (existingUserByUsername) {
-      throw new ConflictException('User with this username already exists');
-    }
-
+    
+    // Hash password
+    const hashedPassword = await bcrypt.hash(password, 10);
+    
     // Create new user
-    const user = await this.userModel.create({
+    return this.userModel.create({
       ...createUserDto,
-      status: UserStatus.ACTIVE // Admin-created users are active by default
+      password: hashedPassword,
     });
-
-    return user;
   }
 
   async registerCandidate(registrationDto: CandidateRegistrationDto): Promise<User> {
@@ -79,29 +76,25 @@ export class UserService {
         throw new BadRequestException('You must accept the terms to register');
       }
 
-      // Save images to disk
-      const uploadsDir = path.join(process.cwd(), 'uploads', 'documents');
+      // Upload images to DigitalOcean Spaces
+      let studentPermitUrl = '';
+      let enrollmentProofUrl = '';
       
-      // Create directory if it doesn't exist
-      if (!fs.existsSync(uploadsDir)) {
-        fs.mkdirSync(uploadsDir, { recursive: true });
-      }
-
-      // Generate unique filenames
-      const timestamp = Date.now();
-      const studentPermitPath = path.join('documents', `student-permit-${registrationDto.username}-${timestamp}.jpg`);
-      const enrollmentProofPath = path.join('documents', `enrollment-proof-${registrationDto.username}-${timestamp}.jpg`);
-      
-      // Save base64 images to disk
       try {
-        const studentPermitData = registrationDto.studentPermitImage.replace(/^data:image\/\w+;base64,/, '');
-        const enrollmentProofData = registrationDto.proofOfEnrollmentImage.replace(/^data:image\/\w+;base64,/, '');
+        studentPermitUrl = await this.uploadService.uploadBase64File(
+          registrationDto.studentPermitImage,
+          'documents',
+          'jpg'
+        );
         
-        fs.writeFileSync(path.join(process.cwd(), 'uploads', studentPermitPath), Buffer.from(studentPermitData, 'base64'));
-        fs.writeFileSync(path.join(process.cwd(), 'uploads', enrollmentProofPath), Buffer.from(enrollmentProofData, 'base64'));
+        enrollmentProofUrl = await this.uploadService.uploadBase64File(
+          registrationDto.proofOfEnrollmentImage,
+          'documents',
+          'jpg'
+        );
       } catch (error) {
-        this.logger.error(`Error saving images: ${error.message}`, error.stack);
-        throw new BadRequestException('Invalid image data');
+        this.logger.error(`Error uploading images: ${error.message}`, error.stack);
+        throw new BadRequestException('Failed to upload images');
       }
 
       // Create new user
@@ -114,8 +107,8 @@ export class UserService {
         password: registrationDto.password,
         role: UserRole.CANDIDATE,
         status: UserStatus.INACTIVE, // New users are inactive until approved
-        studentPermitImage: studentPermitPath,
-        proofOfEnrollmentImage: enrollmentProofPath,
+        studentPermitImage: studentPermitUrl,
+        proofOfEnrollmentImage: enrollmentProofUrl,
         termsAccepted: registrationDto.termsAccepted,
         emailVerified: false, // Set email as unverified initially
       });
@@ -127,7 +120,9 @@ export class UserService {
       
       // Generate OTP for email verification
       try {
-        await this.otpService.createOtp(user.id);
+        // Find the user first if you only have the ID
+        const userObj = await this.userModel.findByPk(user.id);
+        await this.otpService.createOtp(userObj);
       } catch (error) {
         this.logger.error(`Failed to generate OTP: ${error.message}`);
         // Continue even if OTP generation fails
@@ -204,7 +199,7 @@ export class UserService {
 
   async approveUser(approvalDto: UserApprovalDto): Promise<User> {
     try {
-      const user = await this.userModel.findByPk(approvalDto.userId);
+      const user = await this.findOne(approvalDto.userId);
       
       if (!user) {
         throw new NotFoundException(`User with ID ${approvalDto.userId} not found`);
@@ -252,7 +247,7 @@ export class UserService {
   /**
    * Find a user by ID
    */
-  async findOne(id: number): Promise<User> {
+  async findOne(id: string): Promise<User> {
     const user = await this.userModel.findByPk(id);
 
     if (!user) {
@@ -266,9 +261,7 @@ export class UserService {
    * Find a user by email (including password for auth)
    */
   async findByEmail(email: string): Promise<User> {
-    const user = await this.userModel.findOne({
-      where: { email },
-    });
+    const user = await this.userModel.findOne({ where: { email } });
 
     if (!user) {
       throw new NotFoundException(`User with email ${email} not found`);
@@ -280,7 +273,7 @@ export class UserService {
   /**
    * Update a user
    */
-  async update(id: number, updateUserDto: UpdateUserDto): Promise<User> {
+  async update(id: string, updateUserDto: UpdateUserDto): Promise<User> {
     const user = await this.findOne(id);
     
     // Check if email is being updated and if it's already in use
@@ -312,7 +305,7 @@ export class UserService {
   /**
    * Delete a user
    */
-  async remove(id: number): Promise<void> {
+  async remove(id: string): Promise<void> {
     const user = await this.findOne(id);
     await user.destroy();
   }
@@ -321,5 +314,12 @@ export class UserService {
     return this.userModel.findAll({
       where: { status: UserStatus.INACTIVE }
     });
+  }
+
+  async verifyUser(userId: string): Promise<User> {
+    const user = await this.findOne(userId);
+    user.emailVerified = true;
+    await user.save();
+    return user;
   }
 } 
