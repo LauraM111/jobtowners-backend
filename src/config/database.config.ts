@@ -1,6 +1,6 @@
 import { SequelizeModuleOptions } from '@nestjs/sequelize';
 import { ConfigService } from '@nestjs/config';
-import OTP from '../modules/auth/entities/otp.entity';
+import Token from '../modules/auth/entities/token.entity';
 import { User } from '../modules/user/entities/user.entity';
 
 export const getDatabaseConfig = (configService: ConfigService): SequelizeModuleOptions => ({
@@ -10,7 +10,7 @@ export const getDatabaseConfig = (configService: ConfigService): SequelizeModule
   username: configService.get<string>('DB_USERNAME'),
   password: configService.get<string>('DB_PASSWORD'),
   database: configService.get<string>('DB_NAME'),
-  models: [OTP, User],
+  models: [User, Token],
   autoLoadModels: true,
   synchronize: true,
   logging: true,

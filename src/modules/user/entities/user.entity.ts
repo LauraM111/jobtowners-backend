@@ -143,13 +143,13 @@ export class User extends Model {
   static async hashPassword(instance: User) {
     // Only hash the password if it has been modified
     if (instance.changed('password')) {
-      const salt = await bcrypt.genSalt();
+      const salt = await bcrypt.genSalt(10);
       instance.password = await bcrypt.hash(instance.password, salt);
     }
   }
 
-  async comparePassword(password: string): Promise<boolean> {
-    return bcrypt.compare(password, this.password);
+  async comparePassword(candidatePassword: string): Promise<boolean> {
+    return bcrypt.compare(candidatePassword, this.password);
   }
 
   // Helper method to get full name

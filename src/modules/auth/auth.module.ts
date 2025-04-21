@@ -1,15 +1,15 @@
 import { Module, forwardRef } from '@nestjs/common';
 import { JwtModule } from '@nestjs/jwt';
 import { PassportModule } from '@nestjs/passport';
-import { ConfigModule, ConfigService } from '@nestjs/config';
+import { ConfigService } from '@nestjs/config';
 import { AuthService } from './auth.service';
 import { AuthController } from './auth.controller';
 import { LocalStrategy } from './strategies/local.strategy';
 import { JwtStrategy } from './strategies/jwt.strategy';
 import { UserModule } from '../user/user.module';
-import { OtpService } from './otp.service';
+import { TokenService } from './token.service';
 import { SequelizeModule } from '@nestjs/sequelize';
-import OTP from './entities/otp.entity';
+import Token from './entities/token.entity';
 import { MailModule } from '../mail/mail.module';
 
 @Module({
@@ -23,11 +23,11 @@ import { MailModule } from '../mail/mail.module';
         signOptions: { expiresIn: configService.get('JWT_EXPIRES_IN', '1d') },
       }),
     }),
-    SequelizeModule.forFeature([OTP]),
+    SequelizeModule.forFeature([Token]),
     MailModule,
   ],
   controllers: [AuthController],
-  providers: [AuthService, LocalStrategy, JwtStrategy, OtpService],
-  exports: [AuthService, OtpService],
+  providers: [AuthService, LocalStrategy, JwtStrategy, TokenService],
+  exports: [AuthService, TokenService],
 })
 export class AuthModule {} 

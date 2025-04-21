@@ -10,7 +10,7 @@ import { UserApprovalDto } from './dto/user-approval.dto';
 import { MailService } from '../mail/mail.service';
 import * as fs from 'fs';
 import * as path from 'path';
-import { OtpService } from '../auth/otp.service';
+import { TokenService } from '../auth/token.service';
 import { UploadService } from '../upload/upload.service';
 
 @Injectable()
@@ -21,8 +21,8 @@ export class UserService {
     @InjectModel(User)
     private userModel: typeof User,
     private mailService: MailService,
-    @Inject(forwardRef(() => OtpService))
-    private otpService: OtpService,
+    @Inject(forwardRef(() => TokenService))
+    private tokenService: TokenService,
     private uploadService: UploadService,
   ) {}
 
@@ -118,14 +118,12 @@ export class UserService {
         this.logger.error(`Failed to send welcome email: ${error.message}`);
       });
       
-      // Generate OTP for email verification
+      // Generate verification token and send verification email
       try {
-        // Find the user first if you only have the ID
-        const userObj = await this.userModel.findByPk(user.id);
-        await this.otpService.createOtp(userObj);
+        await this.tokenService.createVerificationToken(user);
       } catch (error) {
-        this.logger.error(`Failed to generate OTP: ${error.message}`);
-        // Continue even if OTP generation fails
+        this.logger.error(`Failed to send verification email: ${error.message}`);
+        // Continue even if email sending fails
       }
       
       return user;
@@ -320,6 +318,21 @@ export class UserService {
     const user = await this.findOne(userId);
     user.emailVerified = true;
     await user.save();
+    return user;
+  }
+
+  /**
+   * Update a user's password
+   */
+  async updatePassword(userId: string, newPassword: string): Promise<User> {
+    const user = await this.findOne(userId);
+    
+    // Set the new password (will be hashed by the BeforeUpdate hook)
+    user.password = newPassword;
+    
+    // Save the user
+    await user.save();
+    
     return user;
   }
 } 
