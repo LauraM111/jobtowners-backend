@@ -18,15 +18,12 @@ if (fs.existsSync('.env.local')) {
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
   const configService = app.get(ConfigService);
-  
   // Global prefix
   app.setGlobalPrefix('api/v1');
-  
   app.enableCors({
     origin: [process.env.FRONTEND_URL || 'https://jobtowners.co'],
     credentials: true,
   });
-   
   // Use Helmet for security headers
   app.use(helmet());
   
