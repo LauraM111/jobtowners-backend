@@ -32,6 +32,7 @@ import { Public } from '../auth/decorators/public.decorator';
 import { Request } from 'express';
 import { UpdateProfileDto } from './dto/update-profile.dto';
 import { formatUserProfile } from './helpers/profile-formatter.helper';
+import { ChangePasswordDto } from './dto/change-password.dto';
 
 @ApiTags('Users')
 @Controller('users')
@@ -77,21 +78,19 @@ export class UserController {
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Change user password' })
   @ApiResponse({ status: 200, description: 'Password changed successfully' })
+  @ApiResponse({ status: 400, description: 'Bad request - Current password is incorrect or new password is invalid' })
+  @ApiResponse({ status: 401, description: 'Unauthorized - User not authenticated' })
   async changePassword(
     @Req() req: Request, 
-    @Body() body: { currentPassword: string; newPassword: string }
+    @Body() changePasswordDto: ChangePasswordDto
   ) {
     const userId = req.user['sub']; // Extract user ID from JWT payload
-    const user = await this.userService.findOne(userId);
     
-    // Verify current password
-    const isPasswordValid = await user.comparePassword(body.currentPassword);
-    if (!isPasswordValid) {
-      throw new BadRequestException('Current password is incorrect');
-    }
-    
-    // Update password
-    await this.userService.updatePassword(userId, body.newPassword);
+    await this.userService.changePassword(
+      userId, 
+      changePasswordDto.currentPassword, 
+      changePasswordDto.newPassword
+    );
     
     return successResponse(null, 'Password changed successfully');
   }

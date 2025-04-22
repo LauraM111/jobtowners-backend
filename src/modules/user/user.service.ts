@@ -335,4 +335,25 @@ export class UserService {
     
     return user;
   }
+
+  /**
+   * Change a user's password with current password verification
+   */
+  async changePassword(userId: string, currentPassword: string, newPassword: string): Promise<User> {
+    const user = await this.findOne(userId);
+    
+    // Verify current password
+    const isPasswordValid = await user.comparePassword(currentPassword);
+    if (!isPasswordValid) {
+      throw new BadRequestException('Current password is incorrect');
+    }
+    
+    // Set the new password (will be hashed by the BeforeUpdate hook)
+    user.password = newPassword;
+    
+    // Save the user
+    await user.save();
+    
+    return user;
+  }
 } 
