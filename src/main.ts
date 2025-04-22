@@ -26,7 +26,7 @@ async function bootstrap() {
     origin: [process.env.FRONTEND_URL || 'https://jobtowners.co'],
     credentials: true,
   });
-  
+   
   // Use Helmet for security headers
   app.use(helmet());
   
