@@ -21,7 +21,7 @@ async function bootstrap() {
   // Global prefix
   app.setGlobalPrefix('api/v1');
   app.enableCors({
-    origin: [process.env.FRONTEND_URL || 'https://jobtowners.co'],
+    origin: [ 'https://jobtowners.co', 'https://admin.jobtowners.co', 'http://localhost:3000'],
     credentials: true,
   });
   // Use Helmet for security headers
