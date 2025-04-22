@@ -13,6 +13,7 @@ import {
   ConflictException,
   BadRequestException,
   Patch,
+  Req,
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiParam, ApiBearerAuth } from '@nestjs/swagger';
 import { UserService } from './user.service';
@@ -28,11 +29,72 @@ import { Roles } from '../auth/decorators/roles.decorator';
 import { UserRole } from './entities/user.entity';
 import { successResponse } from '../../common/helpers/response.helper';
 import { Public } from '../auth/decorators/public.decorator';
+import { Request } from 'express';
+import { UpdateProfileDto } from './dto/update-profile.dto';
+import { formatUserProfile } from './helpers/profile-formatter.helper';
 
 @ApiTags('Users')
 @Controller('users')
 export class UserController {
   constructor(private readonly userService: UserService) {}
+
+  @Get('profile')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Get current user profile' })
+  @ApiResponse({ status: 200, description: 'User profile retrieved successfully' })
+  async getProfile(@Req() req: Request) {
+    const userId = req.user['sub']; // Extract user ID from JWT payload
+    const user = await this.userService.findOne(userId);
+    
+    // Remove sensitive information and format
+    const { password, ...userData } = user.toJSON();
+    const formattedProfile = formatUserProfile(userData);
+    
+    return successResponse(formattedProfile, 'User profile retrieved successfully');
+  }
+
+  @Put('profile')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Update current user profile' })
+  @ApiResponse({ status: 200, description: 'User profile updated successfully' })
+  @ApiResponse({ status: 400, description: 'Bad request - Invalid data' })
+  @ApiResponse({ status: 409, description: 'Conflict - Email or username already exists' })
+  async updateProfile(@Req() req: Request, @Body() updateProfileDto: UpdateProfileDto) {
+    const userId = req.user['sub']; // Extract user ID from JWT payload
+    const updatedUser = await this.userService.update(userId, updateProfileDto);
+    
+    // Remove sensitive information and format
+    const { password, ...userData } = updatedUser.toJSON();
+    const formattedProfile = formatUserProfile(userData);
+    
+    return successResponse(formattedProfile, 'User profile updated successfully');
+  }
+
+  @Put('change-password')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Change user password' })
+  @ApiResponse({ status: 200, description: 'Password changed successfully' })
+  async changePassword(
+    @Req() req: Request, 
+    @Body() body: { currentPassword: string; newPassword: string }
+  ) {
+    const userId = req.user['sub']; // Extract user ID from JWT payload
+    const user = await this.userService.findOne(userId);
+    
+    // Verify current password
+    const isPasswordValid = await user.comparePassword(body.currentPassword);
+    if (!isPasswordValid) {
+      throw new BadRequestException('Current password is incorrect');
+    }
+    
+    // Update password
+    await this.userService.updatePassword(userId, body.newPassword);
+    
+    return successResponse(null, 'Password changed successfully');
+  }
 
   @Post()
   @UseGuards(JwtAuthGuard, RolesGuard)
@@ -228,7 +290,8 @@ export class UserController {
   @ApiResponse({ status: 404, description: 'User not found.' })
   async findOne(@Param('id') id: string) {
     const user = await this.userService.findOne(id);
-    return user;
+    const { password, ...result } = user.toJSON();
+    return successResponse(result, 'User found');
   }
 
   @Patch(':id')

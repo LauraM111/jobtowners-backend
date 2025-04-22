@@ -5,6 +5,7 @@ import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import * as dotenv from 'dotenv';
 import * as fs from 'fs';
 import helmet from 'helmet';
+import { ConfigService } from '@nestjs/config';
 
 // Load .env file
 dotenv.config();
@@ -16,9 +17,15 @@ if (fs.existsSync('.env.local')) {
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
+  const configService = app.get(ConfigService);
   
-  // Enable CORS
-  app.enableCors();
+  // Global prefix
+  app.setGlobalPrefix('api/v1');
+  
+  app.enableCors({
+    origin: [process.env.FRONTEND_URL || 'https://jobtowners.co'],
+    credentials: true,
+  });
   
   // Use Helmet for security headers
   app.use(helmet());
@@ -29,14 +36,8 @@ async function bootstrap() {
       whitelist: true,
       transform: true,
       forbidNonWhitelisted: true,
-      transformOptions: {
-        enableImplicitConversion: true,
-      },
     }),
   );
-  
-  // Set global prefix
-  app.setGlobalPrefix('api/v1');
   
   // Setup Swagger
   const config = new DocumentBuilder()
@@ -46,10 +47,10 @@ async function bootstrap() {
     .addBearerAuth()
     .build();
   const document = SwaggerModule.createDocument(app, config);
-  SwaggerModule.setup('api/v1/docs', app, document);
+  SwaggerModule.setup('api/docs', app, document);
   
   // Start the server
-  const port = process.env.PORT || 3000;
+  const port = configService.get<number>('PORT') || 3000;
   await app.listen(port);
   console.log(`Application is running on: http://localhost:${port}`);
 }
