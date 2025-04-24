@@ -15,6 +15,7 @@ import { AdminUserSeeder } from './modules/user/admin-user-seeder';
 import { getDatabaseConfig } from './config/database.config';
 import { UploadModule } from './modules/upload/upload.module';
 import { ResumeModule } from './modules/resume/resume.module';
+import { CompanyModule } from './modules/company/company.module';
 
 @Module({
   imports: [
@@ -39,6 +40,7 @@ import { ResumeModule } from './modules/resume/resume.module';
     MailModule,
     UploadModule,
     ResumeModule,
+    CompanyModule,
   ],
   controllers: [AppController],
   providers: [

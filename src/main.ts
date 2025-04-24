@@ -29,11 +29,13 @@ async function bootstrap() {
   app.use(helmet());
   
   // Apply validation pipe
-  app.useGlobalPipes(new ValidationPipe({
-    whitelist: true,
-    transform: true,
-    forbidNonWhitelisted: true,
-  }));
+  app.useGlobalPipes(
+    new ValidationPipe({
+      whitelist: true,  // This will strip properties that don't have any decorators
+      forbidNonWhitelisted: false,  // This will not throw an error for non-whitelisted properties
+      transform: true,  // This will transform payloads to be objects typed according to their DTO classes
+    }),
+  );
   
   // Setup Swagger
   const config = new DocumentBuilder()

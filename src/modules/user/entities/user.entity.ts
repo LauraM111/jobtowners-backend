@@ -1,4 +1,4 @@
-import { Column, Model, Table, DataType, BeforeCreate, BeforeUpdate } from 'sequelize-typescript';
+import { Column, Model, Table, DataType, BeforeCreate, BeforeUpdate, HasMany } from 'sequelize-typescript';
 import * as bcrypt from 'bcrypt';
 import { ApiProperty } from '@nestjs/swagger';
 import { v4 as uuidv4 } from 'uuid';
@@ -15,6 +15,12 @@ export enum UserStatus {
   SUSPENDED = 'suspended'
 }
 
+// Function to get the Company model to avoid circular dependency
+function getCompanyModel() {
+  // This will be evaluated at runtime, not during import
+  return require('../../company/entities/company.entity').Company;
+}
+
 @Table({
   tableName: 'users',
   timestamps: true
@@ -22,9 +28,9 @@ export enum UserStatus {
 export class User extends Model {
   @ApiProperty({ example: 1, description: 'Unique identifier' })
   @Column({
-    type: DataType.STRING(36),
+    type: DataType.UUID,
+    defaultValue: DataType.UUIDV4,
     primaryKey: true,
-    defaultValue: DataType.UUIDV4
   })
   id: string;
 
