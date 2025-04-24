@@ -12,6 +12,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import { TokenService } from '../auth/token.service';
 import { UploadService } from '../upload/upload.service';
+import { AuthService } from '../auth/auth.service';
 
 @Injectable()
 export class UserService {
@@ -24,6 +25,8 @@ export class UserService {
     @Inject(forwardRef(() => TokenService))
     private tokenService: TokenService,
     private uploadService: UploadService,
+    @Inject(forwardRef(() => AuthService))
+    private authService: AuthService,
   ) {}
 
   /**

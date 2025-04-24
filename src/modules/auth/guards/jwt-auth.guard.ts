@@ -20,18 +20,22 @@ export class JwtAuthGuard extends AuthGuard('jwt') {
       return true;
     }
 
-    // For non-public routes, proceed with JWT validation
+    // For protected routes, proceed with JWT validation
     return super.canActivate(context);
   }
 
-  handleRequest(err, user, info) {
-    // Add logging to debug
-    console.log('JWT Auth Error:', err);
-    console.log('JWT Auth Info:', info);
-    console.log('JWT Auth User:', user);
+  handleRequest(err, user, info, context) {
+    // Add detailed logging for debugging 
+    const request = context.switchToHttp().getRequest();
+    const authHeader = request.headers.authorization;
     
     if (err || !user) {
-      throw err || new UnauthorizedException('Invalid token');
+      throw new UnauthorizedException({
+        message: 'Invalid token',
+        error: err?.message || 'JWT Auth Error',
+        info: info?.message ? `JWT Auth Info: ${info.name}: ${info.message}` : null,
+        user: !!user
+      });
     }
     return user;
   }

@@ -14,6 +14,7 @@ import { JwtAuthGuard } from './modules/auth/guards/jwt-auth.guard';
 import { AdminUserSeeder } from './modules/user/admin-user-seeder';
 import { getDatabaseConfig } from './config/database.config';
 import { UploadModule } from './modules/upload/upload.module';
+import { ResumeModule } from './modules/resume/resume.module';
 
 @Module({
   imports: [
@@ -37,6 +38,7 @@ import { UploadModule } from './modules/upload/upload.module';
     HealthModule,
     MailModule,
     UploadModule,
+    ResumeModule,
   ],
   controllers: [AppController],
   providers: [

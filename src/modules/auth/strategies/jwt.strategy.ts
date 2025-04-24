@@ -10,12 +10,14 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
       jwtFromRequest: ExtractJwt.fromAuthHeaderAsBearerToken(),
       ignoreExpiration: false,
       secretOrKey: configService.get<string>('JWT_SECRET'),
+      passReqToCallback: true,
     });
+    
+    const secret = configService.get<string>('JWT_SECRET');
+    console.log('JWT Secret (first 4 chars):', secret ? secret.substring(0, 4) : 'undefined');
   }
 
-  async validate(payload: any) {
-    // Add logging to debug
-    console.log('JWT Payload:', payload);
+  async validate(request, payload: any) {
     
     return {
       sub: payload.sub,

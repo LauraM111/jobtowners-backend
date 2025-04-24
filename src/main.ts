@@ -18,36 +18,36 @@ if (fs.existsSync('.env.local')) {
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
   const configService = app.get(ConfigService);
-  // Global prefix
+  
+  // Apply global prefix
   app.setGlobalPrefix('api/v1');
-  app.enableCors({
-    origin: [ 'https://jobtowners.co', 'https://admin.jobtowners.co', 'http://localhost:3000'],
-    credentials: true,
-  });
+  
+  // Enable CORS
+  app.enableCors();
+  
   // Use Helmet for security headers
   app.use(helmet());
   
-  // Enable validation
-  app.useGlobalPipes(
-    new ValidationPipe({
-      whitelist: true,
-      transform: true,
-      forbidNonWhitelisted: true,
-    }),
-  );
+  // Apply validation pipe
+  app.useGlobalPipes(new ValidationPipe({
+    whitelist: true,
+    transform: true,
+    forbidNonWhitelisted: true,
+  }));
   
   // Setup Swagger
   const config = new DocumentBuilder()
     .setTitle('JobTowners API')
-    .setDescription('JobTowners API Documentation')
+    .setDescription('The JobTowners API description')
     .setVersion('1.0')
     .addBearerAuth()
     .build();
   const document = SwaggerModule.createDocument(app, config);
   SwaggerModule.setup('api/docs', app, document);
   
-  // Start the server
+  // Get port from config
   const port = configService.get<number>('PORT') || 3000;
+  
   await app.listen(port);
   console.log(`Application is running on: http://localhost:${port}`);
 }

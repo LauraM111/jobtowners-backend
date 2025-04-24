@@ -1,4 +1,4 @@
-import { Injectable, UnauthorizedException, NotFoundException, BadRequestException } from '@nestjs/common';
+import { Injectable, UnauthorizedException, NotFoundException, BadRequestException, Inject, forwardRef } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { UserService } from '../user/user.service';
 import { UserStatus } from '../user/entities/user.entity';
@@ -11,6 +11,7 @@ export class AuthService {
   private readonly logger = new Logger(AuthService.name);
 
   constructor(
+    @Inject(forwardRef(() => UserService))
     private userService: UserService,
     private jwtService: JwtService,
   ) {}
@@ -18,22 +19,40 @@ export class AuthService {
   /**
    * Validate user credentials and return JWT token
    */
-  async login(loginDto: LoginDto) {
-    const user = await this.validateUser(loginDto.email, loginDto.password);
-    
-    if (!user) {
-      throw new UnauthorizedException('Invalid credentials');
-    }
-    
+  async login(user: any) {
     const payload = { 
-      sub: user.id,
+      sub: user.id, 
       email: user.email,
-      role: user.role
+      role: user.role 
     };
     
+    // Log the payload to verify it's correct
+    console.log('Creating JWT with payload:', payload);
+    
+    const token = this.jwtService.sign(payload);
+    
+    // Log the token format to verify it's correct
+    console.log('JWT Token format check:', {
+      isString: typeof token === 'string',
+      length: token.length,
+      startsWithEy: token.startsWith('ey'),
+      parts: token.split('.').length
+    });
+    
+    // Return both the token and user data
     return {
-      access_token: this.jwtService.sign(payload),
-      user
+      access_token: token,
+      user: {
+        id: user.id,
+        email: user.email,
+        firstName: user.firstName,
+        lastName: user.lastName,
+        username: user.username,
+        role: user.role,
+        status: user.status,
+        emailVerified: user.emailVerified,
+        // Add any other user fields you want to include
+      }
     };
   }
 
@@ -41,22 +60,12 @@ export class AuthService {
    * Validate user credentials
    */
   async validateUser(email: string, password: string): Promise<any> {
-    try {
-      const user = await this.userService.findByEmail(email);
-      
-      // Check if password matches
-      const isPasswordValid = await user.comparePassword(password);
-      
-      if (isPasswordValid) {
-        // eslint-disable-next-line @typescript-eslint/no-unused-vars
-        const { password, ...result } = user.toJSON();
-        return result;
-      }
-      
-      return null;
-    } catch (error) {
-      return null;
+    const user = await this.userService.findByEmail(email);
+    if (user && await bcrypt.compare(password, user.password)) {
+      const { password, ...result } = user.toJSON();
+      return result;
     }
+    return null;
   }
 
   /**

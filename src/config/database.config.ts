@@ -2,6 +2,10 @@ import { SequelizeModuleOptions } from '@nestjs/sequelize';
 import { ConfigService } from '@nestjs/config';
 import Token from '../modules/auth/entities/token.entity';
 import { User } from '../modules/user/entities/user.entity';
+import { Resume } from '../modules/resume/entities/resume.entity';
+import { Education } from '../modules/resume/entities/education.entity';
+import { Experience } from '../modules/resume/entities/experience.entity';
+import { Attachment } from '../modules/resume/entities/attachment.entity';
 
 export const getDatabaseConfig = (configService: ConfigService): SequelizeModuleOptions => ({
   dialect: 'mysql',
@@ -10,7 +14,7 @@ export const getDatabaseConfig = (configService: ConfigService): SequelizeModule
   username: configService.get<string>('DB_USERNAME'),
   password: configService.get<string>('DB_PASSWORD'),
   database: configService.get<string>('DB_NAME'),
-  models: [User, Token],
+  models: [User, Token, Resume, Education, Experience, Attachment],
   autoLoadModels: true,
   synchronize: true,
   logging: true,
