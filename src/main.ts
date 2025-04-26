@@ -6,6 +6,7 @@ import * as dotenv from 'dotenv';
 import * as fs from 'fs';
 import helmet from 'helmet';
 import { ConfigService } from '@nestjs/config';
+import * as bodyParser from 'body-parser';
 
 // Load .env file
 dotenv.config();
@@ -16,7 +17,17 @@ if (fs.existsSync('.env.local')) {
 }
 
 async function bootstrap() {
-  const app = await NestFactory.create(AppModule);
+  const app = await NestFactory.create(AppModule, {
+    bodyParser: false, // Disable the built-in body parser
+  });
+  
+  // Use raw body parser for webhook routes
+  app.use('/api/v1/webhooks/stripe', bodyParser.raw({ type: 'application/json' }));
+  
+  // Use JSON body parser for all other routes
+  app.use(bodyParser.json({ limit: '50mb' }));
+  app.use(bodyParser.urlencoded({ extended: true, limit: '50mb' }));
+  
   const configService = app.get(ConfigService);
   
   // Apply global prefix

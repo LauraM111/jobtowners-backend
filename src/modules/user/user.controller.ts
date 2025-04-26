@@ -14,6 +14,7 @@ import {
   BadRequestException,
   Patch,
   Req,
+  NotFoundException,
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiParam, ApiBearerAuth } from '@nestjs/swagger';
 import { UserService } from './user.service';
@@ -26,51 +27,63 @@ import { User } from './entities/user.entity';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
-import { UserRole } from './entities/user.entity';
+import { UserRole, UserStatus } from './entities/user.entity';
 import { successResponse } from '../../common/helpers/response.helper';
 import { Public } from '../auth/decorators/public.decorator';
-import { Request } from 'express';
 import { UpdateProfileDto } from './dto/update-profile.dto';
 import { formatUserProfile } from './helpers/profile-formatter.helper';
 import { ChangePasswordDto } from './dto/change-password.dto';
+import { AdminUpdateUserDto } from './dto/admin-update-user.dto';
+import { Request as ExpressRequest } from 'express';
+import * as bcrypt from 'bcrypt';
+import { QueryTypes } from 'sequelize';
+
+interface RequestWithUser extends ExpressRequest {
+  user: {
+    sub: string;
+    email: string;
+    role: string;
+  };
+}
 
 @ApiTags('Users')
 @Controller('users')
 export class UserController {
   constructor(private readonly userService: UserService) {}
 
-  @Get('profile')
+  @Get('me')
   @UseGuards(JwtAuthGuard)
-  @ApiBearerAuth()
   @ApiOperation({ summary: 'Get current user profile' })
   @ApiResponse({ status: 200, description: 'User profile retrieved successfully' })
-  async getProfile(@Req() req: Request) {
-    const userId = req.user['sub']; // Extract user ID from JWT payload
-    const user = await this.userService.findOne(userId);
-    
-    // Remove sensitive information and format
-    const { password, ...userData } = user.toJSON();
-    const formattedProfile = formatUserProfile(userData);
-    
-    return successResponse(formattedProfile, 'User profile retrieved successfully');
+  @ApiBearerAuth()
+  async getProfile(@Req() req) {
+    try {
+      const user = await this.userService.getUserProfile(req.user.sub);
+      return successResponse(user, 'User profile retrieved successfully');
+    } catch (error) {
+      console.error('Error retrieving user profile:', error);
+      throw error;
+    }
   }
 
-  @Put('profile')
+  @Patch('me')
   @UseGuards(JwtAuthGuard)
-  @ApiBearerAuth()
   @ApiOperation({ summary: 'Update current user profile' })
   @ApiResponse({ status: 200, description: 'User profile updated successfully' })
-  @ApiResponse({ status: 400, description: 'Bad request - Invalid data' })
-  @ApiResponse({ status: 409, description: 'Conflict - Email or username already exists' })
-  async updateProfile(@Req() req: Request, @Body() updateProfileDto: UpdateProfileDto) {
-    const userId = req.user['sub']; // Extract user ID from JWT payload
-    const updatedUser = await this.userService.update(userId, updateProfileDto);
-    
-    // Remove sensitive information and format
-    const { password, ...userData } = updatedUser.toJSON();
-    const formattedProfile = formatUserProfile(userData);
-    
-    return successResponse(formattedProfile, 'User profile updated successfully');
+  @ApiBearerAuth()
+  async updateProfile(@Req() req, @Body() updateUserDto: UpdateUserDto) {
+    try {
+      // Check if email is being attempted to be updated
+      if ('email' in updateUserDto) {
+        throw new BadRequestException('Email cannot be updated');
+      }
+      
+      const updatedUser = await this.userService.updateUserProfile(req.user.sub, updateUserDto);
+      return successResponse(updatedUser, 'User profile updated successfully');
+    } catch (error) {
+      console.error('Error updating user profile:', error);
+      throw error;
+    }
   }
 
   @Put('change-password')
@@ -81,10 +94,10 @@ export class UserController {
   @ApiResponse({ status: 400, description: 'Bad request - Current password is incorrect or new password is invalid' })
   @ApiResponse({ status: 401, description: 'Unauthorized - User not authenticated' })
   async changePassword(
-    @Req() req: Request, 
+    @Req() req: RequestWithUser,
     @Body() changePasswordDto: ChangePasswordDto
   ) {
-    const userId = req.user['sub']; // Extract user ID from JWT payload
+    const userId = req.user.sub;
     
     await this.userService.changePassword(
       userId, 
@@ -294,7 +307,10 @@ export class UserController {
   }
 
   @Patch(':id')
-  @ApiOperation({ summary: 'Update a user' })
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.ADMIN)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Update a user (Admin only)' })
   @ApiParam({ name: 'id', description: 'User ID' })
   @ApiResponse({ 
     status: 200, 
@@ -304,8 +320,8 @@ export class UserController {
   @ApiResponse({ status: 400, description: 'Bad request.' })
   @ApiResponse({ status: 404, description: 'User not found.' })
   @ApiResponse({ status: 409, description: 'User with this email already exists.' })
-  async update(@Param('id') id: string, @Body() updateUserDto: UpdateUserDto) {
-    const user = await this.userService.update(id, updateUserDto);
+  async adminUpdate(@Param('id') id: string, @Body() adminUpdateUserDto: AdminUpdateUserDto) {
+    const user = await this.userService.adminUpdate(id, adminUpdateUserDto);
     return user;
   }
 
@@ -342,5 +358,122 @@ export class UserController {
   async getUserProfile(@Param('id') id: string) {
     const user = await this.userService.findOne(id);
     return user;
+  }
+
+  @Public()
+  @Post('create-admin')
+  @ApiOperation({ summary: 'Create admin user (temporary)' })
+  @ApiResponse({ status: 201, description: 'Admin user created successfully' })
+  async createAdmin() {
+    try {
+      // Check if admin exists
+      try {
+        await this.userService.findByEmail('admin@jobtowners.com');
+        return successResponse(null, 'Admin user already exists');
+      } catch (error) {
+        // Create admin user
+        const hashedPassword = await bcrypt.hash('Admin@123', 10);
+        
+        const adminUser = {
+          firstName: 'Admin',
+          lastName: 'User',
+          username: 'admin',
+          email: 'admin@jobtowners.com',
+          password: hashedPassword,
+          role: UserRole.ADMIN,
+          status: UserStatus.ACTIVE,
+          emailVerified: true,
+          termsAccepted: true
+        };
+        
+        await this.userService.create(adminUser);
+        return successResponse(null, 'Admin user created successfully');
+      }
+    } catch (error) {
+      throw new BadRequestException('Failed to create admin user');
+    }
+  }
+
+  @Public()
+  @Post('reset-admin-password')
+  @ApiOperation({ summary: 'Reset admin password (temporary)' })
+  @ApiResponse({ status: 200, description: 'Admin password reset successfully' })
+  async resetAdminPassword() {
+    try {
+      // Find admin user
+      let adminUser;
+      try {
+        adminUser = await this.userService.findByEmail('admin@jobtowners.com');
+      } catch (error) {
+        throw new NotFoundException('Admin user not found');
+      }
+      
+      // Reset password directly using updatePassword method
+      await this.userService.updatePassword(adminUser.id, 'Admin@123');
+      
+      return successResponse(null, 'Admin password reset successfully');
+    } catch (error) {
+      console.error('Error resetting admin password:', error);
+      throw new BadRequestException('Failed to reset admin password');
+    }
+  }
+
+  @Public()
+  @Post('reset-admin-password-sql')
+  @ApiOperation({ summary: 'Reset admin password with SQL (temporary)' })
+  @ApiResponse({ status: 200, description: 'Admin password reset successfully' })
+  async resetAdminPasswordSql() {
+    try {
+      // Inject Sequelize in the constructor
+      const sequelize = this.userService['sequelize']; // Access the sequelize instance from userService
+      
+      if (!sequelize) {
+        throw new BadRequestException('Sequelize instance not available');
+      }
+      
+      // Reset password with direct SQL query
+      const hashedPassword = await bcrypt.hash('Admin@123', 10);
+      
+      await sequelize.query(
+        `UPDATE users SET password = ? WHERE email = 'admin@jobtowners.com'`,
+        {
+          replacements: [hashedPassword],
+          type: QueryTypes.UPDATE
+        }
+      );
+      
+      return successResponse(null, 'Admin password reset successfully');
+    } catch (error) {
+      console.error('Error resetting admin password:', error);
+      throw new BadRequestException('Failed to reset admin password');
+    }
+  }
+
+  @Public()
+  @Post('create-new-admin')
+  @ApiOperation({ summary: 'Create new admin user (temporary)' })
+  @ApiResponse({ status: 201, description: 'New admin user created successfully' })
+  async createNewAdmin() {
+    try {
+      // Create a new admin user with a different email
+      const hashedPassword = await bcrypt.hash('Admin@123', 10);
+      
+      const adminUser = {
+        firstName: 'Admin',
+        lastName: 'User',
+        username: 'admin2',
+        email: 'admin2@jobtowners.com',
+        password: hashedPassword,
+        role: UserRole.ADMIN,
+        status: UserStatus.ACTIVE,
+        emailVerified: true,
+        termsAccepted: true
+      };
+      
+      await this.userService.create(adminUser);
+      return successResponse({ email: 'admin2@jobtowners.com', password: 'Admin@123' }, 'New admin user created successfully');
+    } catch (error) {
+      throw new BadRequestException('Failed to create new admin user');
+    }
   }
 } 

@@ -33,7 +33,7 @@ export class User extends Model {
     primaryKey: true,
   })
   id: string;
-
+  
   @ApiProperty({ example: 'John', description: 'First name' })
   @Column({
     type: DataType.STRING,
@@ -143,6 +143,12 @@ export class User extends Model {
     defaultValue: false,
   })
   emailVerified: boolean;
+
+  @Column({
+    type: DataType.STRING,
+    allowNull: true
+  })
+  stripeCustomerId: string;
 
   @BeforeCreate
   @BeforeUpdate

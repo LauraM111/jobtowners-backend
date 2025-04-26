@@ -8,9 +8,9 @@ import { Resume } from './resume.entity';
 })
 export class Attachment extends Model {
   @Column({
-    type: DataType.STRING(36),
+    type: DataType.UUID,
+    defaultValue: DataType.UUIDV4,
     primaryKey: true,
-    defaultValue: DataType.UUIDV4
   })
   id: string;
 
@@ -28,7 +28,7 @@ export class Attachment extends Model {
 
   @ForeignKey(() => Resume)
   @Column({
-    type: DataType.STRING(36),
+    type: DataType.UUID,
     allowNull: false
   })
   resumeId: string;

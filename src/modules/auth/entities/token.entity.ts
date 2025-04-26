@@ -1,4 +1,4 @@
-import { Column, Model, Table, DataType, ForeignKey, BelongsTo, BeforeCreate } from 'sequelize-typescript';
+import { Column, Model, Table, DataType, ForeignKey, BelongsTo } from 'sequelize-typescript';
 import { v4 as uuidv4 } from 'uuid';
 import { User } from '../../user/entities/user.entity';
 
@@ -11,11 +11,11 @@ export enum TokenType {
   tableName: 'tokens',
   timestamps: true
 })
-export default class Token extends Model {
+export default class Token extends Model<Token> {
   @Column({
-    type: DataType.STRING(36),
+    type: DataType.UUID,
+    defaultValue: DataType.UUIDV4,
     primaryKey: true,
-    defaultValue: DataType.UUIDV4
   })
   id: string;
 
@@ -26,10 +26,10 @@ export default class Token extends Model {
   token: string;
 
   @Column({
-    type: DataType.ENUM(...Object.values(TokenType)),
+    type: DataType.STRING,
     allowNull: false
   })
-  type: TokenType;
+  type: string;
 
   @Column({
     type: DataType.DATE,
@@ -39,25 +39,17 @@ export default class Token extends Model {
 
   @Column({
     type: DataType.BOOLEAN,
-    defaultValue: false,
-    field: 'used'
+    defaultValue: false
   })
   used: boolean;
 
   @ForeignKey(() => User)
   @Column({
-    type: DataType.STRING(36),
+    type: DataType.UUID,
     allowNull: false
   })
   userId: string;
 
   @BelongsTo(() => User)
   user: User;
-
-  @BeforeCreate
-  static generateId(instance: Token) {
-    if (!instance.id) {
-      instance.id = uuidv4();
-    }
-  }
 } 

@@ -16,6 +16,19 @@ import { getDatabaseConfig } from './config/database.config';
 import { UploadModule } from './modules/upload/upload.module';
 import { ResumeModule } from './modules/resume/resume.module';
 import { CompanyModule } from './modules/company/company.module';
+import { SubscriptionModule } from './modules/subscription/subscription.module';
+import { DatabaseModule } from './database/database.module';
+
+// Import entities from their correct locations
+import { User } from './modules/user/entities/user.entity';
+import Token from './modules/auth/entities/token.entity';
+import { Resume } from './modules/resume/entities/resume.entity';
+import { Education } from './modules/resume/entities/education.entity';
+import { Experience } from './modules/resume/entities/experience.entity';
+import { Attachment } from './modules/resume/entities/attachment.entity';
+import { Company } from './modules/company/entities/company.entity';
+import { SubscriptionPlan } from './modules/subscription/entities/subscription-plan.entity';
+import { Subscription } from './modules/subscription/entities/subscription.entity';
 
 @Module({
   imports: [
@@ -28,9 +41,12 @@ import { CompanyModule } from './modules/company/company.module';
     // Database
     SequelizeModule.forRootAsync({
       imports: [ConfigModule],
-      inject: [ConfigService],
       useFactory: getDatabaseConfig,
+      inject: [ConfigService],
     }),
+    
+    // Database initialization module
+    DatabaseModule,
     
     // Modules
     UserModule,
@@ -41,6 +57,7 @@ import { CompanyModule } from './modules/company/company.module';
     UploadModule,
     ResumeModule,
     CompanyModule,
+    SubscriptionModule,
   ],
   controllers: [AppController],
   providers: [

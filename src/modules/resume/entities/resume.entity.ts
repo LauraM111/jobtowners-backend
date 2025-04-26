@@ -17,9 +17,9 @@ export enum Gender {
 })
 export class Resume extends Model {
   @Column({
-    type: DataType.STRING(36),
+    type: DataType.UUID,
+    defaultValue: DataType.UUIDV4,
     primaryKey: true,
-    defaultValue: DataType.UUIDV4
   })
   id: string;
 
@@ -160,8 +160,8 @@ export class Resume extends Model {
   // Relations
   @ForeignKey(() => User)
   @Column({
-    type: DataType.STRING(36),
-    allowNull: false
+    type: DataType.UUID,
+    allowNull: false,
   })
   userId: string;
 

@@ -8,9 +8,9 @@ import { Resume } from './resume.entity';
 })
 export class Education extends Model {
   @Column({
-    type: DataType.STRING(36),
+    type: DataType.UUID,
+    defaultValue: DataType.UUIDV4,
     primaryKey: true,
-    defaultValue: DataType.UUIDV4
   })
   id: string;
 
@@ -46,7 +46,7 @@ export class Education extends Model {
 
   @ForeignKey(() => Resume)
   @Column({
-    type: DataType.STRING(36),
+    type: DataType.UUID,
     allowNull: false
   })
   resumeId: string;

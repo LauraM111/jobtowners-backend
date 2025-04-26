@@ -60,12 +60,25 @@ export class AuthService {
    * Validate user credentials
    */
   async validateUser(email: string, password: string): Promise<any> {
-    const user = await this.userService.findByEmail(email);
-    if (user && await bcrypt.compare(password, user.password)) {
-      const { password, ...result } = user.toJSON();
-      return result;
+    console.log(`Attempting to validate user with email: ${email}`);
+    
+    try {
+      const user = await this.userService.findByEmail(email);
+      console.log(`User found: ${user.id}, role: ${user.role}`);
+      
+      const isPasswordValid = await bcrypt.compare(password, user.password);
+      console.log(`Password valid: ${isPasswordValid}`);
+      
+      if (isPasswordValid) {
+        const { password, ...result } = user.toJSON();
+        return result;
+      }
+      
+      return null;
+    } catch (error) {
+      console.error(`Error validating user: ${error.message}`);
+      return null;
     }
-    return null;
   }
 
   /**

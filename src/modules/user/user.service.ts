@@ -13,6 +13,7 @@ import * as path from 'path';
 import { TokenService } from '../auth/token.service';
 import { UploadService } from '../upload/upload.service';
 import { AuthService } from '../auth/auth.service';
+import { AdminUpdateUserDto } from './dto/admin-update-user.dto';
 
 @Injectable()
 export class UserService {
@@ -44,7 +45,7 @@ export class UserService {
       throw new ConflictException('Email already exists');
     }
     
-    // Hash password
+    // Hash password with the same method used in the seeder
     const hashedPassword = await bcrypt.hash(password, 10);
     
     // Create new user
@@ -277,28 +278,6 @@ export class UserService {
   async update(id: string, updateUserDto: UpdateUserDto): Promise<User> {
     const user = await this.findOne(id);
     
-    // Check if email is being updated and if it's already in use
-    if (updateUserDto.email && updateUserDto.email !== user.email) {
-      const existingUser = await this.userModel.findOne({
-        where: { email: updateUserDto.email }
-      });
-      
-      if (existingUser) {
-        throw new ConflictException('User with this email already exists');
-      }
-    }
-    
-    // Check if username is being updated and if it's already in use
-    if (updateUserDto.username && updateUserDto.username !== user.username) {
-      const existingUser = await this.userModel.findOne({
-        where: { username: updateUserDto.username }
-      });
-      
-      if (existingUser) {
-        throw new ConflictException('User with this username already exists');
-      }
-    }
-    
     await user.update(updateUserDto);
     return user;
   }
@@ -357,6 +336,74 @@ export class UserService {
     // Save the user
     await user.save();
     
+    return user;
+  }
+
+  /**
+   * Get user profile
+   */
+  async getUserProfile(userId: string): Promise<User> {
+    const user = await this.userModel.findByPk(userId, {
+      attributes: { exclude: ['password'] } // Exclude password from the response
+    });
+    
+    if (!user) {
+      throw new NotFoundException('User not found');
+    }
+    
+    return user;
+  }
+
+  /**
+   * Update user profile
+   */
+  async updateUserProfile(userId: string, updateUserDto: UpdateUserDto): Promise<User> {
+    const user = await this.userModel.findByPk(userId);
+    
+    if (!user) {
+      throw new NotFoundException('User not found');
+    }
+    
+    // Update user with provided fields
+    await user.update(updateUserDto);
+    
+    // Return updated user without password
+    const updatedUser = await this.userModel.findByPk(userId, {
+      attributes: { exclude: ['password'] }
+    });
+    
+    return updatedUser;
+  }
+
+  /**
+   * Admin update a user (can update email, username, role, status)
+   */
+  async adminUpdate(id: string, adminUpdateUserDto: AdminUpdateUserDto): Promise<User> {
+    const user = await this.findOne(id);
+    
+    // Check if email is being updated and if it's already in use
+    if (adminUpdateUserDto.email && adminUpdateUserDto.email !== user.email) {
+      const existingUser = await this.userModel.findOne({
+        where: { email: adminUpdateUserDto.email }
+      });
+      
+      if (existingUser) {
+        throw new ConflictException('User with this email already exists');
+      }
+    }
+    
+    // Check if username is being updated and if it's already in use
+    if (adminUpdateUserDto.username && adminUpdateUserDto.username !== user.username) {
+      const existingUser = await this.userModel.findOne({
+        where: { username: adminUpdateUserDto.username }
+      });
+      
+      if (existingUser) {
+        throw new ConflictException('User with this username already exists');
+      }
+    }
+    
+    await user.update(adminUpdateUserDto);
     return user;
   }
 } 

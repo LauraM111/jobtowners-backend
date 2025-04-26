@@ -7,6 +7,7 @@ import { Company } from '../modules/company/entities/company.entity';
 import { Sequelize } from 'sequelize-typescript';
 import * as fs from 'fs';
 import * as path from 'path';
+import { DatabaseInitService } from './database-init.service';
 
 @Module({
   imports: [
@@ -41,13 +42,14 @@ import * as path from 'path';
     }),
     SequelizeModule.forFeature([User]),
   ],
-  providers: [AdminUserSeeder],
-  exports: [AdminUserSeeder],
+  providers: [AdminUserSeeder, DatabaseInitService],
+  exports: [AdminUserSeeder, DatabaseInitService],
 })
 export class DatabaseModule implements OnModuleInit {
   constructor(
     private sequelize: Sequelize,
     private configService: ConfigService,
+    private readonly databaseInitService: DatabaseInitService
   ) {}
 
   async onModuleInit() {
@@ -81,5 +83,8 @@ export class DatabaseModule implements OnModuleInit {
     } catch (error) {
       console.error('Error running migrations:', error);
     }
+
+    // This will run when the module is initialized
+    await this.databaseInitService.initDatabase();
   }
 } 
