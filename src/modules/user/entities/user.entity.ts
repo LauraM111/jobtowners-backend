@@ -33,7 +33,7 @@ export class User extends Model {
     primaryKey: true,
   })
   id: string;
-  
+
   @ApiProperty({ example: 'John', description: 'First name' })
   @Column({
     type: DataType.STRING,

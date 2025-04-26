@@ -26,7 +26,7 @@ export class AdminUpdateUserDto {
 
   @ApiProperty({ example: '+1234567890', description: 'Phone number' })
   @IsOptional()
-  @IsPhoneNumber(null, { message: 'Invalid phone number format' })
+  
   phoneNumber?: string;
 
   @ApiProperty({ enum: UserRole, example: UserRole.CANDIDATE, description: 'User role' })

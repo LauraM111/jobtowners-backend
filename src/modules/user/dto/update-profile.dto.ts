@@ -25,7 +25,7 @@ export class UpdateProfileDto {
 
   @ApiProperty({ example: '+1234567890', description: 'Phone number', required: false })
   @IsOptional()
-  @IsPhoneNumber(null, { message: 'Invalid phone number format' })
+  
   phoneNumber?: string;
 
   @ApiProperty({ example: 'john.doe@example.com', description: 'Email address', required: false })

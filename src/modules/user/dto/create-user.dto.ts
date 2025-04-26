@@ -26,7 +26,7 @@ export class CreateUserDto {
 
   @ApiProperty({ example: '+1234567890', description: 'Phone number' })
   @IsOptional()
-  @IsPhoneNumber(null, { message: 'Invalid phone number format' })
+  
   phoneNumber?: string;
 
   @ApiProperty({ example: 'Password123!', description: 'Password' })
