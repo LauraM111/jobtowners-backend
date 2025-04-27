@@ -33,8 +33,15 @@ async function bootstrap() {
   // Apply global prefix
   app.setGlobalPrefix('api/v1');
   
-  // Enable CORS
-  app.enableCors();
+  // Enable CORS with more detailed configuration
+  app.enableCors({
+    origin: process.env.NODE_ENV === 'production'
+      ? ['https://your-production-domain.com']
+      : ['http://localhost:3000','localhost:3000'], // Correct dev URL
+    credentials: true,
+    methods: 'GET,HEAD,PUT,PATCH,POST,DELETE,OPTIONS',
+    allowedHeaders: 'Content-Type,Authorization,X-Requested-With,Accept',
+  });
   
   // Use Helmet for security headers
   app.use(helmet());
@@ -42,9 +49,9 @@ async function bootstrap() {
   // Apply validation pipe
   app.useGlobalPipes(
     new ValidationPipe({
-      whitelist: true,  // This will strip properties that don't have any decorators
-      forbidNonWhitelisted: false,  // This will not throw an error for non-whitelisted properties
-      transform: true,  // This will transform payloads to be objects typed according to their DTO classes
+      whitelist: true,
+      transform: true,
+      forbidNonWhitelisted: true,
     }),
   );
   

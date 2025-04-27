@@ -15,6 +15,7 @@ import {
   Patch,
   Req,
   NotFoundException,
+  HttpException,
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiParam, ApiBearerAuth } from '@nestjs/swagger';
 import { UserService } from './user.service';
@@ -129,57 +130,36 @@ export class UserController {
   @Public()
   @Post('register/candidate')
   @HttpCode(HttpStatus.CREATED)
-  @ApiOperation({ summary: 'Register a new candidate' })
-  @ApiResponse({ 
-    status: 201, 
-    description: 'The candidate has been successfully registered.',
-    type: User 
-  })
-  @ApiResponse({ status: 400, description: 'Bad request.' })
-  @ApiResponse({ status: 409, description: 'User with this email already exists.' })
+  @ApiOperation({ summary: 'Register a new candidate user' })
+  @ApiResponse({ status: 201, description: 'User registered successfully' })
+  @ApiResponse({ status: 400, description: 'Bad request' })
   async registerCandidate(@Body() registrationDto: CandidateRegistrationDto) {
     try {
       const user = await this.userService.registerCandidate(registrationDto);
-      
-      // Check if user exists before calling toJSON
-      if (user && typeof user.toJSON === 'function') {
-        const { password, ...result } = user.toJSON();
-        return successResponse({
-          ...result,
-          emailVerificationRequired: true,
-        }, 'Candidate registered successfully. Please verify your email to complete registration.');
-      } else {
-        // If user doesn't have toJSON method, return the user object directly
-        // But still remove the password
-        const { password, ...result } = user as any;
-        return successResponse({
-          ...result,
-          emailVerificationRequired: true,
-        }, 'Candidate registered successfully. Please verify your email to complete registration.');
-      }
+      return {
+        success: true,
+        message: 'Candidate registered successfully',
+        data: {
+          id: user.id,
+          email: user.email,
+          username: user.username,
+          role: user.role,
+          status: user.status
+        }
+      };
     } catch (error) {
-      // Log the error for debugging
-    //   console.error('Error in registerCandidate:', error);
-      
-      // Handle specific errors with custom responses
       if (error instanceof ConflictException) {
-        // Return a more user-friendly message for duplicate email/username
-        return {
+        throw new HttpException({
           success: false,
           message: error.message,
-          statusCode: HttpStatus.CONFLICT
-        };
-      } else if (error instanceof BadRequestException) {
-        // Return validation errors
-        return {
-          success: false,
-          message: error.message,
-          statusCode: HttpStatus.BAD_REQUEST
-        };
+          data: null
+        }, HttpStatus.CONFLICT);
       }
-      
-      // Re-throw other errors to be handled by the global exception filter
-      throw error;
+      throw new HttpException({
+        success: false,
+        message: error.message,
+        data: null
+      }, HttpStatus.BAD_REQUEST);
     }
   }
 

@@ -306,16 +306,12 @@ export class UserService {
   /**
    * Update a user's password
    */
-  async updatePassword(userId: string, newPassword: string): Promise<User> {
-    const user = await this.findOne(userId);
-    
-    // Set the new password (will be hashed by the BeforeUpdate hook)
-    user.password = newPassword;
-    
-    // Save the user
-    await user.save();
-    
-    return user;
+  async updatePassword(userId: string, newPassword: string): Promise<void> {
+    // If newPassword is already hashed, use it directly
+    await this.userModel.update(
+      { password: newPassword },
+      { where: { id: userId } }
+    );
   }
 
   /**

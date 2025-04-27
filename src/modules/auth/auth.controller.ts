@@ -1,4 +1,4 @@
-import { Controller, Post, Body, UseGuards, Get, Param, Query, Request, UnauthorizedException } from '@nestjs/common';
+import { Controller, Post, Body, UseGuards, Get, Param, Query, Request, UnauthorizedException, BadRequestException } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
 import { AuthService } from './auth.service';
 import { LocalAuthGuard } from './guards/local-auth.guard';
@@ -20,14 +20,24 @@ export class AuthController {
     private readonly tokenService: TokenService,
   ) {}
 
+  @Post('login')
   @Public()
   @UseGuards(LocalAuthGuard)
-  @Post('login')
   @ApiOperation({ summary: 'Login with email and password' })
   @ApiResponse({ status: 200, description: 'Login successful' })
+  @ApiResponse({ status: 401, description: 'Invalid credentials' })
   async login(@Request() req, @Body() loginDto: LoginDto) {
-    const result = await this.authService.login(req.user);
-    return successResponse(result, 'Login successful');
+    try {
+      const result = await this.authService.login(req.user);
+      return {
+        success: true,
+        message: 'Login successful',
+        data: result
+      };
+    } catch (error) {
+      console.error('Login error:', error);
+      throw new UnauthorizedException('Invalid email or password');
+    }
   }
 
   @Public()
@@ -35,8 +45,21 @@ export class AuthController {
   @ApiOperation({ summary: 'Verify email address' })
   @ApiResponse({ status: 200, description: 'Email verified successfully' })
   async verifyEmail(@Query('token') token: string) {
-    await this.tokenService.verifyToken(token, TokenType.EMAIL_VERIFICATION);
-    return successResponse(null, 'Email verified successfully');
+    try {
+      await this.authService.verifyEmail(token);
+      // Redirect to frontend success page or return success message
+      return { message: 'Email verified successfully' };
+    } catch (error) {
+      // Instead of letting the exception filter handle it with a generic message,
+      // provide more specific error information
+      if (error.message === 'Token expired') {
+        throw new BadRequestException('Email verification token has expired. Please request a new one.');
+      } else if (error.message === 'Token already used') {
+        throw new BadRequestException('This verification link has already been used.');
+      } else {
+        throw new BadRequestException('Invalid or expired verification token. Please request a new one.');
+      }
+    }
   }
 
   @Public()

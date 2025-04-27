@@ -11,31 +11,61 @@ export class AdminUserSeeder {
   ) {}
 
   async seed() {
-    // Check if admin user already exists
-    const existingAdmin = await this.userModel.findOne({
-      where: { email: 'admin@jobtowners.com' }
-    });
+    const users = [
+      {
+        email: 'admin@jobtowners.com',
+        firstName: 'Admin',
+        lastName: 'User',
+        username: 'admin',
+        password: 'Admin123!',
+        role: UserRole.ADMIN
+      },
+      {
+        email: 'candidate@jobtowners.com',
+        firstName: 'Sample',
+        lastName: 'Candidate',
+        username: 'candidate',
+        password: 'Candidate123!',
+        role: UserRole.CANDIDATE
+      },
+      {
+        email: 'employer@jobtowners.com',
+        firstName: 'Sample',
+        lastName: 'Employer',
+        username: 'employer',
+        password: 'Employer123!',
+        role: UserRole.EMPLOYER
+      }
+    ];
 
-    if (existingAdmin) {
-      console.log('Admin user already exists, skipping seeder');
-      return;
+    for (const userData of users) {
+      // Check if user already exists
+      const existingUser = await this.userModel.findOne({
+        where: { email: userData.email }
+      });
+
+      if (existingUser) {
+        console.log(`User ${userData.email} already exists, skipping`);
+        continue;
+      }
+
+      // Create user
+      const salt = await bcrypt.genSalt();
+      const hashedPassword = await bcrypt.hash(userData.password, 10);
+
+      await this.userModel.create({
+        firstName: userData.firstName,
+        lastName: userData.lastName,
+        username: userData.username,
+        email: userData.email,
+        password: hashedPassword,
+        role: userData.role,
+        status: UserStatus.ACTIVE,
+        emailVerified: true,
+        termsAccepted: true
+      });
+
+      console.log(`User ${userData.email} created successfully`);
     }
-
-    // Create admin user
-    const salt = await bcrypt.genSalt();
-    const hashedPassword = await bcrypt.hash('Admin123!', salt);
-
-    await this.userModel.create({
-      firstName: 'Admin',
-      lastName: 'User',
-      username: 'admin',
-      email: 'admin@jobtowners.com',
-      password: hashedPassword,
-      role: UserRole.ADMIN,
-      status: UserStatus.ACTIVE,
-      termsAccepted: true
-    });
-
-    console.log('Admin user created successfully');
   }
 } 

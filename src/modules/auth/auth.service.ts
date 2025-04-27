@@ -5,6 +5,7 @@ import { UserStatus } from '../user/entities/user.entity';
 import { LoginDto } from './dto/login.dto';
 import * as bcrypt from 'bcrypt';
 import { Logger } from '@nestjs/common';
+import { TokenService } from '../token/token.service';
 
 @Injectable()
 export class AuthService {
@@ -14,6 +15,7 @@ export class AuthService {
     @Inject(forwardRef(() => UserService))
     private userService: UserService,
     private jwtService: JwtService,
+    private tokenService: TokenService,
   ) {}
 
   /**
@@ -66,6 +68,7 @@ export class AuthService {
       const user = await this.userService.findByEmail(email);
       console.log(`User found: ${user.id}, role: ${user.role}`);
       
+      // Use direct bcrypt comparison for maximum reliability
       const isPasswordValid = await bcrypt.compare(password, user.password);
       console.log(`Password valid: ${isPasswordValid}`);
       
@@ -104,5 +107,33 @@ export class AuthService {
       this.logger.error(`Failed to reset password: ${error.message}`);
       throw new BadRequestException('Failed to reset password');
     }
+  }
+
+  async verifyEmail(token: string): Promise<void> {
+    const tokenRecord = await this.tokenService.findOne({
+      token,
+      type: 'email_verification',
+    });
+
+    if (!tokenRecord) {
+      throw new Error('Token not found');
+    }
+
+    if (tokenRecord.used) {
+      throw new Error('Token already used');
+    }
+
+    if (new Date() > tokenRecord.expiresAt) {
+      throw new Error('Token expired');
+    }
+
+    // Mark token as used
+    await this.tokenService.update(tokenRecord.id, { used: true });
+
+    // Update user's email verification status
+    await this.userService.update(String(tokenRecord.userId), { 
+      emailVerified: true,
+      emailVerifiedAt: new Date()
+    });
   }
 } 

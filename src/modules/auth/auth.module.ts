@@ -11,6 +11,7 @@ import { TokenService } from './token.service';
 import { SequelizeModule } from '@nestjs/sequelize';
 import Token from './entities/token.entity';
 import { MailModule } from '../mail/mail.module';
+import { TokenModule } from '../token/token.module';
 
 @Module({
   imports: [
@@ -28,6 +29,7 @@ import { MailModule } from '../mail/mail.module';
     }),
     SequelizeModule.forFeature([Token]),
     MailModule,
+    TokenModule,
   ],
   controllers: [AuthController],
   providers: [AuthService, LocalStrategy, JwtStrategy, TokenService],

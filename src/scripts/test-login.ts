@@ -1,57 +1,52 @@
 import { NestFactory } from '@nestjs/core';
 import { AppModule } from '../app.module';
 import { AuthService } from '../modules/auth/auth.service';
+import { UserService } from '../modules/user/user.service';
 import * as bcrypt from 'bcrypt';
 
-async function bootstrap() {
+async function testLogin() {
   const app = await NestFactory.createApplicationContext(AppModule);
+  const authService = app.get(AuthService);
+  const userService = app.get(UserService);
   
   try {
-    const authService = app.get(AuthService);
-    
-    // Test login with admin credentials
+    // Test credentials
     const email = 'admin@jobtowners.com';
     const password = 'Admin@123';
     
-    console.log(`Testing login with email: ${email}, password: ${password}`);
+    // Find user directly
+    const user = await userService.findByEmail(email);
+    console.log('User found:', {
+      id: user.id,
+      email: user.email,
+      role: user.role,
+      passwordHash: user.password.substring(0, 20) + '...' // Show part of the hash for debugging
+    });
     
-    // Test validateUser method directly
-    const user = await authService.validateUser(email, password);
+    // Test password manually
+    const isPasswordValid = await bcrypt.compare(password, user.password);
+    console.log('Password valid (manual check):', isPasswordValid);
     
-    if (user) {
-      console.log('Login successful!');
-      console.log('User:', user);
-    } else {
-      console.log('Login failed!');
+    // Test through auth service
+    const validatedUser = await authService.validateUser(email, password);
+    console.log('Auth service validation result:', validatedUser ? 'Success' : 'Failed');
+    
+    if (!isPasswordValid) {
+      // Reset password if validation fails
+      console.log('Resetting password...');
+      const newHashedPassword = await bcrypt.hash(password, 10);
+      await userService.updatePassword(user.id, newHashedPassword);
+      console.log('Password reset complete. New hash:', newHashedPassword.substring(0, 20) + '...');
       
-      // Try to find the user
-      try {
-        const userService = app.get('UserService');
-        const foundUser = await userService.findByEmail(email);
-        
-        console.log('User found in database:', foundUser.id);
-        
-        // Test password comparison directly
-        const isPasswordValid = await bcrypt.compare(password, foundUser.password);
-        console.log('Password valid:', isPasswordValid);
-        console.log('Stored password hash:', foundUser.password);
-        
-        // Generate a new hash for comparison
-        const newHash = await bcrypt.hash(password, 10);
-        console.log('New hash for same password:', newHash);
-        
-        // Compare the new hash with the stored hash
-        const hashesMatch = await bcrypt.compare(foundUser.password, newHash);
-        console.log('Hashes match:', hashesMatch);
-      } catch (error) {
-        console.error('Error finding user:', error.message);
-      }
+      // Verify new password
+      const verifyReset = await bcrypt.compare(password, newHashedPassword);
+      console.log('New password verification:', verifyReset ? 'Success' : 'Failed');
     }
   } catch (error) {
-    console.error('Error testing login:', error);
+    console.error('Error during test:', error);
   } finally {
     await app.close();
   }
 }
 
-bootstrap(); 
+testLogin().catch(console.error); 

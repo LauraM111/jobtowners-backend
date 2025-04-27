@@ -73,7 +73,7 @@ export class User extends Model {
 
   @Column({
     type: DataType.STRING,
-    allowNull: false
+    allowNull: false,
   })
   password: string;
 
@@ -153,10 +153,13 @@ export class User extends Model {
   @BeforeCreate
   @BeforeUpdate
   static async hashPassword(instance: User) {
-    // Only hash the password if it has been modified
+    // Only hash the password if it has been modified AND it's not already hashed
     if (instance.changed('password')) {
-      const salt = await bcrypt.genSalt(10);
-      instance.password = await bcrypt.hash(instance.password, salt);
+      // Check if the password is already hashed (bcrypt hashes start with $2a$, $2b$, or $2y$)
+      if (!instance.password.startsWith('$2')) {
+        const salt = await bcrypt.genSalt(10);
+        instance.password = await bcrypt.hash(instance.password, salt);
+      }
     }
   }
 
