@@ -102,6 +102,22 @@ export class SubscriptionPlan extends Model {
   })
   deletedAt: Date;
 
+  @Column({
+    type: DataType.INTEGER,
+    allowNull: false,
+    defaultValue: 0,
+    comment: 'Number of jobs allowed with this plan'
+  })
+  numberOfJobs: number;
+
+  @Column({
+    type: DataType.INTEGER,
+    allowNull: false,
+    defaultValue: 0,
+    comment: 'Number of resume views allowed with this plan'
+  })
+  resumeViewsCount: number;
+
   @BeforeCreate
   static generateId(instance: SubscriptionPlan) {
     if (!instance.id) {

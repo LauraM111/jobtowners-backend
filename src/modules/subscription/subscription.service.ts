@@ -154,6 +154,28 @@ export class SubscriptionService {
         throw new BadRequestException(`Payment not successful. Status: ${paymentIntent.status}`);
       }
       
+      // Check if customer has a payment method
+      const customer = await this.stripeService.retrieveCustomer(subscription.stripeCustomerId);
+      
+      if (!customer.invoice_settings.default_payment_method) {
+        // If payment intent has a payment method, attach it
+        if (paymentIntent.payment_method) {
+          await this.stripeService.attachPaymentMethodToCustomer(
+            subscription.stripeCustomerId,
+            paymentIntent.payment_method as string
+          );
+          
+          await this.stripeService.updateCustomerDefaultPaymentMethod(
+            subscription.stripeCustomerId,
+            paymentIntent.payment_method as string
+          );
+        } else {
+          throw new BadRequestException(
+            'Customer has no default payment method. Please add a payment method first.'
+          );
+        }
+      }
+      
       // Calculate end date based on plan interval
       const endDate = this.calculateEndDate(
         new Date(),
@@ -265,5 +287,82 @@ export class SubscriptionService {
     }
     
     return endDate;
+  }
+
+  /**
+   * Create a checkout session for subscription
+   */
+  async createCheckoutSession(userId: string, planId: string): Promise<any> {
+    try {
+      const user = await this.userModel.findByPk(userId);
+      const plan = await this.subscriptionPlanModel.findByPk(planId);
+      
+      if (!plan) {
+        throw new NotFoundException('Subscription plan not found');
+      }
+      
+      // Create or get Stripe customer
+      let stripeCustomerId = user.stripeCustomerId;
+      if (!stripeCustomerId) {
+        const customer = await this.stripeService.createCustomer(user.email);
+        stripeCustomerId = customer.id;
+      }
+      
+      // Create checkout session
+      const session = await this.stripeService.createCheckoutSession(
+        stripeCustomerId,
+        plan.stripePriceId,
+        `${process.env.FRONTEND_URL}/subscription/success?session_id={CHECKOUT_SESSION_ID}`,
+        `${process.env.FRONTEND_URL}/subscription/cancel`
+      );
+      
+      return { sessionId: session.id, url: session.url };
+    } catch (error) {
+      this.logger.error(`Error creating checkout session: ${error.message}`);
+      throw error;
+    }
+  }
+
+  /**
+   * Attach a payment method to customer
+   */
+  async attachPaymentMethod(userId: string, paymentMethodId: string): Promise<any> {
+    try {
+      // Find the user
+      const user = await this.userModel.findByPk(userId);
+      if (!user) {
+        throw new NotFoundException('User not found');
+      }
+      
+      // Create or get Stripe customer
+      let stripeCustomerId = user.stripeCustomerId;
+      if (!stripeCustomerId) {
+        const customer = await this.stripeService.createCustomer(
+          user.email,
+          `${user.firstName} ${user.lastName}`
+        );
+        stripeCustomerId = customer.id;
+        
+        // Update user with Stripe customer ID
+        await user.update({ stripeCustomerId });
+      }
+      
+      // Attach payment method to customer
+      await this.stripeService.attachPaymentMethodToCustomer(
+        stripeCustomerId,
+        paymentMethodId
+      );
+      
+      // Set as default payment method
+      await this.stripeService.updateCustomerDefaultPaymentMethod(
+        stripeCustomerId,
+        paymentMethodId
+      );
+      
+      return { success: true };
+    } catch (error) {
+      this.logger.error(`Error attaching payment method: ${error.message}`);
+      throw error;
+    }
   }
 } 

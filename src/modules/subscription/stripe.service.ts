@@ -105,13 +105,21 @@ export class StripeService {
   async createSubscription(
     customerId: string,
     priceId: string,
+    paymentMethodId?: string,
   ): Promise<Stripe.Subscription> {
     try {
-      return await this.stripe.subscriptions.create({
+      const subscriptionData: Stripe.SubscriptionCreateParams = {
         customer: customerId,
         items: [{ price: priceId }],
         expand: ['latest_invoice.payment_intent'],
-      });
+      };
+
+      // Add payment method if provided
+      if (paymentMethodId) {
+        subscriptionData.default_payment_method = paymentMethodId;
+      }
+
+      return await this.stripe.subscriptions.create(subscriptionData);
     } catch (error) {
       this.logger.error(`Error creating Stripe subscription: ${error.message}`);
       throw error;
@@ -176,6 +184,77 @@ export class StripeService {
       });
     } catch (error) {
       this.logger.error(`Error creating Stripe setup intent: ${error.message}`);
+      throw error;
+    }
+  }
+
+  /**
+   * Attach a payment method to a customer
+   */
+  async attachPaymentMethodToCustomer(customerId: string, paymentMethodId: string): Promise<Stripe.PaymentMethod> {
+    try {
+      return await this.stripe.paymentMethods.attach(paymentMethodId, {
+        customer: customerId,
+      });
+    } catch (error) {
+      this.logger.error(`Error attaching payment method to customer: ${error.message}`);
+      throw error;
+    }
+  }
+
+  /**
+   * Update customer's default payment method
+   */
+  async updateCustomerDefaultPaymentMethod(customerId: string, paymentMethodId: string): Promise<Stripe.Customer> {
+    try {
+      return await this.stripe.customers.update(customerId, {
+        invoice_settings: {
+          default_payment_method: paymentMethodId,
+        },
+      });
+    } catch (error) {
+      this.logger.error(`Error updating customer default payment method: ${error.message}`);
+      throw error;
+    }
+  }
+
+  /**
+   * Create a checkout session
+   */
+  async createCheckoutSession(
+    customerId: string,
+    priceId: string,
+    successUrl: string,
+    cancelUrl: string
+  ): Promise<Stripe.Checkout.Session> {
+    try {
+      return await this.stripe.checkout.sessions.create({
+        customer: customerId,
+        payment_method_types: ['card'],
+        line_items: [
+          {
+            price: priceId,
+            quantity: 1,
+          },
+        ],
+        mode: 'subscription',
+        success_url: successUrl,
+        cancel_url: cancelUrl,
+      });
+    } catch (error) {
+      this.logger.error(`Error creating checkout session: ${error.message}`);
+      throw error;
+    }
+  }
+
+  /**
+   * Retrieve a customer from Stripe
+   */
+  async retrieveCustomer(customerId: string): Promise<Stripe.Customer> {
+    try {
+      return await this.stripe.customers.retrieve(customerId) as Stripe.Customer;
+    } catch (error) {
+      this.logger.error(`Error retrieving Stripe customer: ${error.message}`);
       throw error;
     }
   }

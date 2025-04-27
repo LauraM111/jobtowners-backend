@@ -69,4 +69,23 @@ export class SubscriptionController {
       throw new BadRequestException(error.message);
     }
   }
+
+  @Post('attach-payment-method')
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Attach a payment method to customer' })
+  @ApiResponse({ status: 200, description: 'Payment method attached successfully' })
+  async attachPaymentMethod(
+    @Request() req,
+    @Body() data: { paymentMethodId: string }
+  ) {
+    try {
+      const result = await this.subscriptionService.attachPaymentMethod(
+        req.user.sub,
+        data.paymentMethodId
+      );
+      return successResponse(result, 'Payment method attached successfully');
+    } catch (error) {
+      throw new BadRequestException(error.message);
+    }
+  }
 } 

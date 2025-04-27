@@ -41,4 +41,16 @@ export class CreateSubscriptionPlanDto {
   @IsEnum(PlanStatus)
   @IsOptional()
   status?: PlanStatus;
+
+  @ApiPropertyOptional({ description: 'Number of jobs allowed with this plan', example: 10 })
+  @IsNumber()
+  @Min(0)
+  @IsOptional()
+  numberOfJobs?: number;
+
+  @ApiPropertyOptional({ description: 'Number of resume views allowed with this plan', example: 50 })
+  @IsNumber()
+  @Min(0)
+  @IsOptional()
+  resumeViewsCount?: number;
 } 
