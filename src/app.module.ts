@@ -11,7 +11,6 @@ import { MailModule } from './modules/mail/mail.module';
 import { AppController } from './app.controller';
 import configuration from './config/configuration';
 import { JwtAuthGuard } from './modules/auth/guards/jwt-auth.guard';
-import { AdminUserSeeder } from './modules/user/admin-user-seeder';
 import { getDatabaseConfig } from './config/database.config';
 import { UploadModule } from './modules/upload/upload.module';
 import { ResumeModule } from './modules/resume/resume.module';
@@ -73,7 +72,6 @@ import { Job } from './modules/job/entities/job.entity';
 })
 export class AppModule {
   constructor(
-    private readonly adminUserSeeder: AdminUserSeeder,
     private sequelize: Sequelize
   ) {
     this.syncDatabase();
@@ -103,7 +101,6 @@ export class AppModule {
 
   private async seedDatabase() {
     try {
-      await this.adminUserSeeder.seed();
     } catch (error) {
       console.error('Error seeding database:', error);
     }
