@@ -1,4 +1,4 @@
-import { Column, Model, Table, DataType, ForeignKey, BelongsTo, BeforeCreate } from 'sequelize-typescript';
+import { Column, Model, Table, DataType, ForeignKey, BelongsTo, BeforeCreate, DeletedAt } from 'sequelize-typescript';
 import { v4 as uuidv4 } from 'uuid';
 import { User } from '../../user/entities/user.entity';
 import { SubscriptionPlan } from './subscription-plan.entity';
@@ -21,8 +21,8 @@ export enum SubscriptionStatus {
 export class Subscription extends Model {
   @Column({
     type: DataType.UUID,
+    defaultValue: DataType.UUIDV4,
     primaryKey: true,
-    defaultValue: DataType.UUIDV4
   })
   id: string;
 
@@ -30,8 +30,6 @@ export class Subscription extends Model {
   @Column({
     type: DataType.UUID,
     allowNull: false,
-    onDelete: 'CASCADE',
-    onUpdate: 'CASCADE'
   })
   userId: string;
 
@@ -42,8 +40,6 @@ export class Subscription extends Model {
   @Column({
     type: DataType.UUID,
     allowNull: false,
-    onDelete: 'CASCADE',
-    onUpdate: 'CASCADE'
   })
   planId: string;
 
@@ -52,55 +48,49 @@ export class Subscription extends Model {
 
   @Column({
     type: DataType.STRING,
-    allowNull: true
+    allowNull: true,
   })
   stripeSubscriptionId: string;
 
   @Column({
     type: DataType.STRING,
-    allowNull: true
+    allowNull: true,
   })
   stripeCustomerId: string;
 
   @Column({
     type: DataType.DATE,
-    allowNull: false
+    allowNull: false,
   })
   startDate: Date;
 
   @Column({
     type: DataType.DATE,
-    allowNull: true
+    allowNull: true,
   })
   endDate: Date;
 
   @Column({
     type: DataType.STRING,
     allowNull: false,
-    defaultValue: SubscriptionStatus.ACTIVE,
-    validate: {
-      isIn: [Object.values(SubscriptionStatus)]
-    }
+    defaultValue: 'active',
   })
-  status: SubscriptionStatus;
+  status: string;
 
   @Column({
     type: DataType.BOOLEAN,
     allowNull: false,
-    defaultValue: false
+    defaultValue: false,
   })
   cancelAtPeriodEnd: boolean;
 
   @Column({
     type: DataType.DATE,
-    allowNull: true
+    allowNull: true,
   })
   canceledAt: Date;
 
-  @Column({
-    type: DataType.DATE,
-    allowNull: true
-  })
+  @DeletedAt
   deletedAt: Date;
 
   @BeforeCreate

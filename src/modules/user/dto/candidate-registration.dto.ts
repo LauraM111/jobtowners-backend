@@ -1,4 +1,4 @@
-import { IsString, IsEmail, IsNotEmpty, MinLength, MaxLength, IsBoolean, IsPhoneNumber, IsOptional } from 'class-validator';
+import { IsString, IsEmail, IsNotEmpty, MinLength, MaxLength, IsBoolean, IsPhoneNumber, IsOptional, IsBase64 } from 'class-validator';
 import { ApiProperty } from '@nestjs/swagger';
 
 export class CandidateRegistrationDto {
@@ -15,13 +15,6 @@ export class CandidateRegistrationDto {
   @MinLength(2)
   @MaxLength(50)
   lastName: string;
-
-  @ApiProperty({ example: 'johndoe', description: 'Username' })
-  @IsString()
-  @IsNotEmpty()
-  @MinLength(3)
-  @MaxLength(20)
-  username: string;
 
   @ApiProperty({ example: 'john.doe@example.com', description: 'Email address' })
   @IsEmail()
@@ -47,11 +40,13 @@ export class CandidateRegistrationDto {
   @ApiProperty({ example: 'base64-encoded-image', description: 'Student permit image (base64)' })
   @IsString()
   @IsNotEmpty()
+  @IsBase64()
   studentPermitImage: string;
 
   @ApiProperty({ example: 'base64-encoded-image', description: 'Proof of enrollment image (base64)' })
   @IsString()
   @IsNotEmpty()
+  @IsBase64()
   proofOfEnrollmentImage: string;
 
   @ApiProperty({ example: 'candidate', description: 'User type', required: false })

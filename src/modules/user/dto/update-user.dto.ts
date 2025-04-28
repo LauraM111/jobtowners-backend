@@ -1,7 +1,8 @@
 import { ApiProperty, PartialType } from '@nestjs/swagger';
-import { IsString, IsOptional, IsPhoneNumber, MinLength, MaxLength, IsBoolean, IsDate } from 'class-validator';
+import { IsString, IsOptional, IsPhoneNumber, MinLength, MaxLength, IsBoolean, IsDate, IsEmail } from 'class-validator';
 import { Type } from 'class-transformer';
 import { CreateUserDto } from './create-user.dto';
+import { UserRole } from '../entities/user.entity';
 
 export class UpdateUserDto extends PartialType(CreateUserDto) {
   @ApiProperty({ description: 'First name', example: 'John', required: false })
@@ -42,6 +43,11 @@ export class UpdateUserDto extends PartialType(CreateUserDto) {
   @IsDate()
   @Type(() => Date)
   emailVerifiedAt?: Date;
+
+  @ApiProperty({ example: 'john.doe@example.com', description: 'Email address' })
+  @IsEmail()
+  @IsOptional()
+  email?: string;
 
   // Note: email is intentionally not included to prevent updates
 } 

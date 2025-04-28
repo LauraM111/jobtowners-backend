@@ -8,6 +8,9 @@ import { Sequelize } from 'sequelize-typescript';
 import * as fs from 'fs';
 import * as path from 'path';
 import { DatabaseInitService } from './database-init.service';
+import { Logger } from '@nestjs/common';
+import { Job } from '../modules/job/entities/job.entity';
+import Token from '../modules/auth/entities/token.entity';
 
 @Module({
   imports: [
@@ -21,14 +24,14 @@ import { DatabaseInitService } from './database-init.service';
         username: configService.get('DB_USERNAME'),
         password: configService.get('DB_PASSWORD'),
         database: configService.get('DB_NAME'),
-        models: [User, Company],
-        autoLoadModels: true,
-        synchronize: true,
+        models: [User, Company, Job, Token],
+        autoLoadModels: false,
+        synchronize: false,
         sync: {
           force: false,
-          alter: true,
+          alter: false,
         },
-        logging: true,
+        logging: configService.get('NODE_ENV') !== 'production',
         define: {
           charset: 'utf8mb4',
           collate: 'utf8mb4_unicode_ci',
@@ -46,6 +49,8 @@ import { DatabaseInitService } from './database-init.service';
   exports: [AdminUserSeeder, DatabaseInitService],
 })
 export class DatabaseModule implements OnModuleInit {
+  private readonly logger = new Logger(DatabaseModule.name);
+  
   constructor(
     private sequelize: Sequelize,
     private configService: ConfigService,
@@ -53,6 +58,8 @@ export class DatabaseModule implements OnModuleInit {
   ) {}
 
   async onModuleInit() {
+    // Skip auto-sync completely
+    
     // Run migrations
     try {
       const migrationsDir = path.join(__dirname, 'migrations');

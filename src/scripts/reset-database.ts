@@ -1,36 +1,42 @@
-import * as mysql from 'mysql2/promise';
+import { Sequelize } from 'sequelize-typescript';
 import * as dotenv from 'dotenv';
 
 dotenv.config();
 
 async function resetDatabase() {
-  console.log('Starting database reset...');
-  
-  const connection = await mysql.createConnection({
+  const sequelize = new Sequelize({
+    dialect: 'mysql',
     host: process.env.DB_HOST,
-    port: parseInt(process.env.DB_PORT || '3306'),
-    user: process.env.DB_USERNAME,
+    port: parseInt(process.env.DB_PORT, 10),
+    username: process.env.DB_USERNAME,
     password: process.env.DB_PASSWORD,
+    database: process.env.DB_NAME,
   });
-  
+
   try {
-    console.log('Dropping database if exists...');
-    await connection.query(`DROP DATABASE IF EXISTS ${process.env.DB_NAME}`);
+    console.log('Dropping all tables...');
+    await sequelize.query('SET FOREIGN_KEY_CHECKS = 0');
     
-    console.log('Creating database...');
-    await connection.query(`CREATE DATABASE ${process.env.DB_NAME} 
-                           CHARACTER SET utf8mb4 
-                           COLLATE utf8mb4_unicode_ci`);
+    // Get all tables
+    const [tables] = await sequelize.query(
+      `SELECT table_name FROM information_schema.tables WHERE table_schema = '${process.env.DB_NAME}'`
+    );
     
-    console.log('Database reset completed successfully!');
+    // Drop each table
+    for (const table of tables as any[]) {
+      const tableName = table.table_name || table.TABLE_NAME;
+      await sequelize.query(`DROP TABLE IF EXISTS \`${tableName}\``);
+      console.log(`Dropped table: ${tableName}`);
+    }
+    
+    await sequelize.query('SET FOREIGN_KEY_CHECKS = 1');
+    console.log('All tables dropped successfully');
+    
+    await sequelize.close();
   } catch (error) {
     console.error('Error resetting database:', error);
-    throw error;
-  } finally {
-    await connection.end();
+    await sequelize.close();
   }
 }
 
-resetDatabase()
-  .then(() => process.exit(0))
-  .catch(() => process.exit(1)); 
+resetDatabase(); 

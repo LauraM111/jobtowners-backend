@@ -66,15 +66,6 @@ export class UserService {
         throw new ConflictException('User with this email already exists');
       }
 
-      // Check if user with username already exists
-      const existingUserByUsername = await this.userModel.findOne({
-        where: { username: registrationDto.username }
-      });
-
-      if (existingUserByUsername) {
-        throw new ConflictException('User with this username already exists');
-      }
-
       // Ensure terms are accepted
       if (!registrationDto.termsAccepted) {
         throw new BadRequestException('You must accept the terms to register');
@@ -105,7 +96,6 @@ export class UserService {
       const user = await this.userModel.create({
         firstName: registrationDto.firstName,
         lastName: registrationDto.lastName,
-        username: registrationDto.username,
         email: registrationDto.email,
         phoneNumber: registrationDto.phoneNumber,
         password: registrationDto.password,
@@ -154,15 +144,6 @@ export class UserService {
         throw new ConflictException('User with this email already exists');
       }
 
-      // Check if user with username already exists
-      const existingUserByUsername = await this.userModel.findOne({
-        where: { username: registrationDto.username }
-      });
-
-      if (existingUserByUsername) {
-        throw new ConflictException('User with this username already exists');
-      }
-
       // Ensure terms are accepted
       if (!registrationDto.termsAccepted) {
         throw new BadRequestException('You must accept the terms to register');
@@ -172,7 +153,6 @@ export class UserService {
       const user = await this.userModel.create({
         firstName: registrationDto.firstName,
         lastName: registrationDto.lastName,
-        username: registrationDto.username,
         email: registrationDto.email,
         phoneNumber: registrationDto.phoneNumber,
         password: registrationDto.password,
@@ -372,34 +352,25 @@ export class UserService {
   }
 
   /**
-   * Admin update a user (can update email, username, role, status)
+   * Admin update a user (can update email, role, status)
    */
-  async adminUpdate(id: string, adminUpdateUserDto: AdminUpdateUserDto): Promise<User> {
+  async adminUpdateUser(id: string, adminUpdateUserDto: AdminUpdateUserDto): Promise<User> {
     const user = await this.findOne(id);
     
-    // Check if email is being updated and if it's already in use
+    // Check if email is being changed and if it's already in use
     if (adminUpdateUserDto.email && adminUpdateUserDto.email !== user.email) {
       const existingUser = await this.userModel.findOne({
         where: { email: adminUpdateUserDto.email }
       });
       
       if (existingUser) {
-        throw new ConflictException('User with this email already exists');
+        throw new ConflictException('Email already in use');
       }
     }
     
-    // Check if username is being updated and if it's already in use
-    if (adminUpdateUserDto.username && adminUpdateUserDto.username !== user.username) {
-      const existingUser = await this.userModel.findOne({
-        where: { username: adminUpdateUserDto.username }
-      });
-      
-      if (existingUser) {
-        throw new ConflictException('User with this username already exists');
-      }
-    }
-    
+    // Update user
     await user.update(adminUpdateUserDto);
-    return user;
+    
+    return this.findOne(id);
   }
 } 

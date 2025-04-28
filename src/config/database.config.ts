@@ -1,5 +1,7 @@
+import { registerAs } from '@nestjs/config';
 import { SequelizeModuleOptions } from '@nestjs/sequelize';
 import { ConfigService } from '@nestjs/config';
+import * as dotenv from 'dotenv';
 import { Sequelize } from 'sequelize-typescript';
 import Token from '../modules/auth/entities/token.entity';
 import { User } from '../modules/user/entities/user.entity';
@@ -10,65 +12,75 @@ import { Attachment } from '../modules/resume/entities/attachment.entity';
 import { Company } from '../modules/company/entities/company.entity';
 import { SubscriptionPlan } from '../modules/subscription/entities/subscription-plan.entity';
 import { Subscription } from '../modules/subscription/entities/subscription.entity';
+import { Job } from '../modules/job/entities/job.entity';
+
+dotenv.config();
+
+export default registerAs('database', (): SequelizeModuleOptions => ({
+  dialect: 'mysql',
+  host: process.env.DB_HOST,
+  port: parseInt(process.env.DB_PORT, 10),
+  username: process.env.DB_USERNAME,
+  password: process.env.DB_PASSWORD,
+  database: process.env.DB_NAME,
+  autoLoadModels: true,
+  synchronize: process.env.DB_SYNC === 'true',
+  logging: process.env.DB_LOGGING === 'true' ? console.log : false,
+  define: {
+    timestamps: true,
+    paranoid: true, // Soft deletes
+  },
+  dialectOptions: {
+    // For MySQL 8.0+
+    authPlugins: {
+      mysql_native_password: () => () => Buffer.from([0])
+    },
+    connectTimeout: 60000
+  },
+}));
 
 export const getDatabaseConfig = (configService: ConfigService): SequelizeModuleOptions => {
-  // Convert DB_LOGGING to a proper function or boolean
-  const dbLogging = configService.get<string>('DB_LOGGING');
-  let logging: boolean | ((sql: string, timing?: number) => void) = false;
-  
-  if (dbLogging === 'true') {
-    logging = console.log;
-  } else if (dbLogging === 'false') {
-    logging = false;
-  }
-  
-  console.log('Database configuration:', {
-    host: configService.get<string>('DB_HOST'),
-    port: configService.get<number>('DB_PORT'),
-    username: configService.get<string>('DB_USERNAME'),
-    database: configService.get<string>('DB_NAME'),
-    sync: configService.get<string>('DB_SYNC'),
-  });
-  
   return {
     dialect: 'mysql',
-    host: configService.get<string>('DB_HOST'),
+    host: configService.get('DB_HOST'),
     port: configService.get<number>('DB_PORT'),
-    username: configService.get<string>('DB_USERNAME'),
-    password: configService.get<string>('DB_PASSWORD'),
-    database: configService.get<string>('DB_NAME'),
-    models: [User, Token, Resume, Education, Experience, Attachment, Company, SubscriptionPlan, Subscription],
-    autoLoadModels: true,
-    synchronize: configService.get<string>('DB_SYNC') === 'true',
-    logging,
-    pool: {
-      max: 5,
-      min: 0,
-      acquire: 180000,
-      idle: 10000
-    },
-    retry: {
-      max: 15,
-      match: [/Deadlock/i, /SequelizeConnectionError/i, /ConnectionError/i, /TimeoutError/i, /SequelizeConnectionRefusedError/i],
-    },
-    dialectOptions: {
-      connectTimeout: 60000,
-      supportBigNumbers: true,
-      bigNumberStrings: true,
-    },
+    username: configService.get('DB_USERNAME'),
+    password: configService.get('DB_PASSWORD'),
+    database: configService.get('DB_NAME'),
+    models: [
+      User, 
+      Token,
+      Company, 
+      SubscriptionPlan,
+      Subscription,
+      Job, 
+      Resume, 
+      Education, 
+      Experience, 
+      Attachment
+    ],
+    autoLoadModels: false,
+    synchronize: false, // We'll handle sync manually in AppModule
+    logging: true,
     define: {
       charset: 'utf8mb4',
       collate: 'utf8mb4_unicode_ci',
       timestamps: true,
-      underscored: false,
+      // Ensure consistent UUID handling
+      defaultScope: {
+        attributes: { exclude: ['deletedAt'] }
+      }
     },
-    sync: {
-      force: true,
-      alter: true,
-      hooks: true,
+    dialectOptions: {
+      supportBigNumbers: true,
+      bigNumberStrings: true,
+      connectTimeout: 60000,
     },
-    query: {
-      raw: false
+    pool: {
+      max: 10,
+      min: 0,
+      acquire: 60000,
+      idle: 10000,
     },
   };
 }; 

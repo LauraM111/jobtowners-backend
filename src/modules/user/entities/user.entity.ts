@@ -1,9 +1,10 @@
-import { Column, Model, Table, DataType, BeforeCreate, BeforeUpdate, HasMany } from 'sequelize-typescript';
+import { Column, Model, Table, DataType, BeforeCreate, BeforeUpdate, HasMany, BeforeSave } from 'sequelize-typescript';
 import * as bcrypt from 'bcrypt';
 import { ApiProperty } from '@nestjs/swagger';
 import { v4 as uuidv4 } from 'uuid';
 
 export enum UserRole {
+  USER = 'user',
   ADMIN = 'admin',
   CANDIDATE = 'candidate',
   EMPLOYER = 'employer'
@@ -23,7 +24,8 @@ function getCompanyModel() {
 
 @Table({
   tableName: 'users',
-  timestamps: true
+  timestamps: true,
+  paranoid: true
 })
 export class User extends Model {
   @ApiProperty({ example: 1, description: 'Unique identifier' })
@@ -48,19 +50,14 @@ export class User extends Model {
   })
   lastName: string;
 
-  @ApiProperty({ example: 'johndoe', description: 'Username' })
-  @Column({
-    type: DataType.STRING,
-    allowNull: false,
-    unique: true
-  })
-  username: string;
-
   @ApiProperty({ example: 'john.doe@example.com', description: 'Email address' })
   @Column({
     type: DataType.STRING,
     allowNull: false,
-    unique: true
+    unique: true,
+    validate: {
+      isEmail: true
+    }
   })
   email: string;
 
@@ -81,7 +78,7 @@ export class User extends Model {
   @Column({
     type: DataType.ENUM(...Object.values(UserRole)),
     allowNull: false,
-    defaultValue: UserRole.CANDIDATE
+    defaultValue: UserRole.USER
   })
   role: UserRole;
 
@@ -89,7 +86,7 @@ export class User extends Model {
   @Column({
     type: DataType.ENUM(...Object.values(UserStatus)),
     allowNull: false,
-    defaultValue: UserStatus.INACTIVE
+    defaultValue: UserStatus.ACTIVE
   })
   status: UserStatus;
 
@@ -149,6 +146,12 @@ export class User extends Model {
     allowNull: true
   })
   stripeCustomerId: string;
+
+  @Column({
+    type: DataType.STRING,
+    allowNull: true
+  })
+  companyName: string;
 
   @BeforeCreate
   @BeforeUpdate

@@ -1,5 +1,5 @@
-import { ApiProperty } from '@nestjs/swagger';
-import { IsEmail, IsEnum, IsNotEmpty, IsOptional, IsPhoneNumber, IsString, Matches, MinLength } from 'class-validator';
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { IsEmail, IsEnum, IsNotEmpty, IsOptional, IsPhoneNumber, IsString, Matches, MinLength, IsBoolean } from 'class-validator';
 import { UserRole } from '../entities/user.entity';
 
 export class CreateUserDto {
@@ -12,12 +12,6 @@ export class CreateUserDto {
   @IsNotEmpty({ message: 'Last name is required' })
   @IsString({ message: 'Last name must be a string' })
   lastName: string;
-
-  @ApiProperty({ example: 'johndoe', description: 'Username' })
-  @IsNotEmpty({ message: 'Username is required' })
-  @IsString({ message: 'Username must be a string' })
-  @Matches(/^[a-zA-Z0-9_-]+$/, { message: 'Username can only contain letters, numbers, underscores, and hyphens' })
-  username: string;
 
   @ApiProperty({ example: 'john.doe@example.com', description: 'Email address' })
   @IsNotEmpty({ message: 'Email is required' })

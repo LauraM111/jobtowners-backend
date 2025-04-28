@@ -1,18 +1,33 @@
 import { 
   Table, Column, Model, DataType, 
-  CreatedAt, UpdatedAt, BelongsTo, ForeignKey 
+  CreatedAt, UpdatedAt, BelongsTo, ForeignKey, BeforeCreate 
 } from 'sequelize-typescript';
 import { CompanyStatus } from '../enums/company-status.enum';
 import { User } from '../../user/entities/user.entity';
+import { v4 as uuidv4 } from 'uuid';
 
-@Table
+@Table({
+  tableName: 'companies',
+  timestamps: true,
+  paranoid: true
+})
 export class Company extends Model {
   @Column({
     type: DataType.UUID,
-    defaultValue: DataType.UUIDV4,
     primaryKey: true,
+    defaultValue: DataType.UUIDV4
   })
   id: string;
+
+  @ForeignKey(() => User)
+  @Column({
+    type: DataType.UUID,
+    allowNull: false
+  })
+  userId: string;
+
+  @BelongsTo(() => User)
+  user: User;
 
   // Basic Company Information
   @Column({

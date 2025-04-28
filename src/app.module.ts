@@ -17,7 +17,8 @@ import { UploadModule } from './modules/upload/upload.module';
 import { ResumeModule } from './modules/resume/resume.module';
 import { CompanyModule } from './modules/company/company.module';
 import { SubscriptionModule } from './modules/subscription/subscription.module';
-import { DatabaseModule } from './database/database.module';
+import { JobModule } from './modules/job/job.module';
+import { Sequelize } from 'sequelize-typescript';
 
 // Import entities from their correct locations
 import { User } from './modules/user/entities/user.entity';
@@ -29,6 +30,7 @@ import { Attachment } from './modules/resume/entities/attachment.entity';
 import { Company } from './modules/company/entities/company.entity';
 import { SubscriptionPlan } from './modules/subscription/entities/subscription-plan.entity';
 import { Subscription } from './modules/subscription/entities/subscription.entity';
+import { Job } from './modules/job/entities/job.entity';
 
 @Module({
   imports: [
@@ -38,15 +40,12 @@ import { Subscription } from './modules/subscription/entities/subscription.entit
       load: [configuration],
     }),
     
-    // Database
+    // Database - use the database config
     SequelizeModule.forRootAsync({
       imports: [ConfigModule],
       useFactory: getDatabaseConfig,
       inject: [ConfigService],
     }),
-    
-    // Database initialization module
-    DatabaseModule,
     
     // Modules
     UserModule,
@@ -58,6 +57,7 @@ import { Subscription } from './modules/subscription/entities/subscription.entit
     ResumeModule,
     CompanyModule,
     SubscriptionModule,
+    JobModule,
   ],
   controllers: [AppController],
   providers: [
@@ -72,8 +72,33 @@ import { Subscription } from './modules/subscription/entities/subscription.entit
   ],
 })
 export class AppModule {
-  constructor(private readonly adminUserSeeder: AdminUserSeeder) {
+  constructor(
+    private readonly adminUserSeeder: AdminUserSeeder,
+    private sequelize: Sequelize
+  ) {
+    this.syncDatabase();
     this.seedDatabase();
+  }
+
+  private async syncDatabase() {
+    try {
+      if (process.env.NODE_ENV === 'development' && process.env.DB_SYNC === 'true') {
+        console.log('Syncing database models...');
+        
+        // First sync without foreign key checks
+        await this.sequelize.query('SET FOREIGN_KEY_CHECKS = 0');
+        
+        // Force sync to recreate tables
+        await this.sequelize.sync({ force: true });
+        
+        // Re-enable foreign key checks
+        await this.sequelize.query('SET FOREIGN_KEY_CHECKS = 1');
+        
+        console.log('Database sync completed');
+      }
+    } catch (error) {
+      console.error('Error syncing database:', error);
+    }
   }
 
   private async seedDatabase() {

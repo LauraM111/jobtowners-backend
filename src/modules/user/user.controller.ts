@@ -16,6 +16,10 @@ import {
   Req,
   NotFoundException,
   HttpException,
+  Request,
+  Query,
+  UseInterceptors,
+  UploadedFile,
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiParam, ApiBearerAuth } from '@nestjs/swagger';
 import { UserService } from './user.service';
@@ -52,19 +56,24 @@ interface RequestWithUser extends ExpressRequest {
 export class UserController {
   constructor(private readonly userService: UserService) {}
 
-  @Get('me')
+  @Get('profile')
   @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
   @ApiOperation({ summary: 'Get current user profile' })
   @ApiResponse({ status: 200, description: 'User profile retrieved successfully' })
-  @ApiBearerAuth()
-  async getProfile(@Req() req) {
-    try {
-      const user = await this.userService.getUserProfile(req.user.sub);
-      return successResponse(user, 'User profile retrieved successfully');
-    } catch (error) {
-      console.error('Error retrieving user profile:', error);
-      throw error;
-    }
+  async getProfile(@Request() req) {
+    const user = await this.userService.findOne(req.user.sub);
+    
+    // Remove sensitive information
+    const userProfile = {
+      id: user.id,
+      firstName: user.firstName,
+      lastName: user.lastName,
+      email: user.email,
+      role: user.role,
+    };
+    
+    return successResponse(userProfile, 'User profile retrieved successfully');
   }
 
   @Patch('me')
@@ -142,7 +151,6 @@ export class UserController {
         data: {
           id: user.id,
           email: user.email,
-          username: user.username,
           role: user.role,
           status: user.status
         }
@@ -301,7 +309,7 @@ export class UserController {
   @ApiResponse({ status: 404, description: 'User not found.' })
   @ApiResponse({ status: 409, description: 'User with this email already exists.' })
   async adminUpdate(@Param('id') id: string, @Body() adminUpdateUserDto: AdminUpdateUserDto) {
-    const user = await this.userService.adminUpdate(id, adminUpdateUserDto);
+    const user = await this.userService.adminUpdateUser(id, adminUpdateUserDto);
     return user;
   }
 
@@ -357,7 +365,6 @@ export class UserController {
         const adminUser = {
           firstName: 'Admin',
           lastName: 'User',
-          username: 'admin',
           email: 'admin@jobtowners.com',
           password: hashedPassword,
           role: UserRole.ADMIN,
@@ -441,7 +448,6 @@ export class UserController {
       const adminUser = {
         firstName: 'Admin',
         lastName: 'User',
-        username: 'admin2',
         email: 'admin2@jobtowners.com',
         password: hashedPassword,
         role: UserRole.ADMIN,
