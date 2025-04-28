@@ -5,7 +5,7 @@ import { UserStatus } from '../user/entities/user.entity';
 import { LoginDto } from './dto/login.dto';
 import * as bcrypt from 'bcrypt';
 import { Logger } from '@nestjs/common';
-import { TokenService } from '../token/token.service';
+import { TokenService } from './token.service';
 
 @Injectable()
 export class AuthService {
@@ -25,7 +25,7 @@ export class AuthService {
     const payload = { 
       sub: user.id, 
       email: user.email,
-      role: user.role 
+      userType: user.userType 
     };
     
     // Log the payload to verify it's correct
@@ -41,19 +41,31 @@ export class AuthService {
       parts: token.split('.').length
     });
     
-    // Return both the token and user data
+    // Return response in the format expected by the frontend
     return {
-      access_token: token,
-      user: {
-        id: user.id,
-        email: user.email,
-        firstName: user.firstName,
-        lastName: user.lastName,
-        username: user.username,
-        role: user.role,
-        status: user.status,
-        emailVerified: user.emailVerified,
-        // Add any other user fields you want to include
+      success: true,
+      message: 'Login successful',
+      data: {
+        access_token: token,
+        user: {
+          id: user.id,
+          email: user.email,
+          firstName: user.firstName,
+          lastName: user.lastName,
+          phoneNumber: user.phoneNumber,
+          userType: user.userType,
+          role: user.userType, // Include role for backward compatibility
+          status: user.status,
+          isEmailVerified: user.isEmailVerified,
+          isActive: user.isActive,
+          companyName: user.companyName,
+          studentPermitImage: user.studentPermitImage,
+          proofOfEnrollmentImage: user.proofOfEnrollmentImage,
+          termsAccepted: user.termsAccepted,
+          stripeCustomerId: user.stripeCustomerId,
+          createdAt: user.createdAt,
+          updatedAt: user.updatedAt
+        }
       }
     };
   }
@@ -66,7 +78,7 @@ export class AuthService {
     
     try {
       const user = await this.userService.findByEmail(email);
-      console.log(`User found: ${user.id}, role: ${user.role}`);
+      console.log(`User found: ${user.id}, type: ${user.userType}`);
       
       // Use direct bcrypt comparison for maximum reliability
       const isPasswordValid = await bcrypt.compare(password, user.password);
@@ -98,15 +110,20 @@ export class AuthService {
   /**
    * Reset a user's password
    */
-  async resetPassword(userId: string, newPassword: string) {
-    try {
-      // Instead of updating directly, use the UserService
-      await this.userService.updatePassword(userId, newPassword);
-      return true;
-    } catch (error) {
-      this.logger.error(`Failed to reset password: ${error.message}`);
-      throw new BadRequestException('Failed to reset password');
+  async resetPassword(userId: number, newPassword: string): Promise<void> {
+    const user = await this.userService.findById(userId);
+    
+    if (!user) {
+      throw new NotFoundException('User not found');
     }
+    
+    // Hash the new password
+    const salt = await bcrypt.genSalt();
+    const hashedPassword = await bcrypt.hash(newPassword, salt);
+    
+    // Update the user's password
+    user.password = hashedPassword;
+    await user.save();
   }
 
   async verifyEmail(token: string): Promise<void> {

@@ -15,13 +15,13 @@ export enum Gender {
   tableName: 'resumes',
   timestamps: true
 })
-export class Resume extends Model {
+export class Resume extends Model<Resume> {
   @Column({
-    type: DataType.UUID,
-    defaultValue: DataType.UUIDV4,
+    type: DataType.INTEGER,
+    autoIncrement: true,
     primaryKey: true,
   })
-  id: string;
+  id: number;
 
   // Personal Details
   @Column({
@@ -160,10 +160,10 @@ export class Resume extends Model {
   // Relations
   @ForeignKey(() => User)
   @Column({
-    type: DataType.UUID,
+    type: DataType.INTEGER,
     allowNull: false,
   })
-  userId: string;
+  userId: number;
 
   @BelongsTo(() => User)
   user: User;
@@ -179,8 +179,7 @@ export class Resume extends Model {
 
   @BeforeCreate
   static generateId(instance: Resume) {
-    if (!instance.id) {
-      instance.id = uuidv4();
-    }
+    // Auto-increment will handle ID generation
+    // No need to set the ID manually
   }
 } 

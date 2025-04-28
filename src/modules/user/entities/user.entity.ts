@@ -1,11 +1,11 @@
 import { Column, Model, Table, DataType, BeforeCreate, BeforeUpdate, HasMany, BeforeSave } from 'sequelize-typescript';
 import * as bcrypt from 'bcrypt';
 import { ApiProperty } from '@nestjs/swagger';
-import { v4 as uuidv4 } from 'uuid';
+import Token from '../../auth/entities/token.entity';
 
-export enum UserRole {
-  USER = 'user',
+export enum UserType {
   ADMIN = 'admin',
+  USER = 'user',
   CANDIDATE = 'candidate',
   EMPLOYER = 'employer'
 }
@@ -16,25 +16,18 @@ export enum UserStatus {
   SUSPENDED = 'suspended'
 }
 
-// Function to get the Company model to avoid circular dependency
-function getCompanyModel() {
-  // This will be evaluated at runtime, not during import
-  return require('../../company/entities/company.entity').Company;
-}
-
 @Table({
   tableName: 'users',
   timestamps: true,
   paranoid: true
 })
 export class User extends Model {
-  @ApiProperty({ example: 1, description: 'Unique identifier' })
   @Column({
-    type: DataType.UUID,
-    defaultValue: DataType.UUIDV4,
+    type: DataType.INTEGER,
+    autoIncrement: true,
     primaryKey: true,
   })
-  id: string;
+  id: number;
 
   @ApiProperty({ example: 'John', description: 'First name' })
   @Column({
@@ -54,10 +47,7 @@ export class User extends Model {
   @Column({
     type: DataType.STRING,
     allowNull: false,
-    unique: true,
-    validate: {
-      isEmail: true
-    }
+    unique: true
   })
   email: string;
 
@@ -68,19 +58,20 @@ export class User extends Model {
   })
   phoneNumber: string;
 
+  @ApiProperty({ description: 'Password (hashed)' })
   @Column({
     type: DataType.STRING,
-    allowNull: false,
+    allowNull: false
   })
   password: string;
 
-  @ApiProperty({ enum: UserRole, example: UserRole.CANDIDATE, description: 'User role' })
+  @ApiProperty({ example: 'admin', description: 'User type' })
   @Column({
-    type: DataType.ENUM(...Object.values(UserRole)),
+    type: DataType.ENUM(...Object.values(UserType)),
     allowNull: false,
-    defaultValue: UserRole.USER
+    defaultValue: UserType.USER
   })
-  role: UserRole;
+  userType: UserType;
 
   @ApiProperty({ enum: UserStatus, example: UserStatus.INACTIVE, description: 'User status' })
   @Column({
@@ -135,23 +126,35 @@ export class User extends Model {
   })
   deletedAt: Date;
 
+  @ApiProperty({ example: true, description: 'Email verification status' })
   @Column({
     type: DataType.BOOLEAN,
-    defaultValue: false,
+    defaultValue: false
   })
-  emailVerified: boolean;
+  isEmailVerified: boolean;
 
+  @ApiProperty({ example: 'cus_123456789', description: 'Stripe customer ID' })
   @Column({
     type: DataType.STRING,
     allowNull: true
   })
   stripeCustomerId: string;
 
+  @ApiProperty({ example: 'Acme Inc.', description: 'Company name (for employers)' })
   @Column({
     type: DataType.STRING,
     allowNull: true
   })
   companyName: string;
+
+  @Column({
+    type: DataType.BOOLEAN,
+    defaultValue: false,
+  })
+  isActive: boolean;
+
+  @HasMany(() => Token)
+  tokens: Token[];
 
   @BeforeCreate
   @BeforeUpdate
@@ -173,12 +176,5 @@ export class User extends Model {
   // Helper method to get full name
   get fullName(): string {
     return `${this.firstName} ${this.lastName}`;
-  }
-
-  @BeforeCreate
-  static generateId(instance: User) {
-    if (!instance.id) {
-      instance.id = uuidv4();
-    }
   }
 } 

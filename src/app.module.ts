@@ -18,6 +18,8 @@ import { CompanyModule } from './modules/company/company.module';
 import { SubscriptionModule } from './modules/subscription/subscription.module';
 import { JobModule } from './modules/job/job.module';
 import { Sequelize } from 'sequelize-typescript';
+import { UserSeeder } from './database/seeders/user.seeder';
+import { DatabaseInitService } from './database/database-init.service';
 
 // Import entities from their correct locations
 import { User } from './modules/user/entities/user.entity';
@@ -39,12 +41,37 @@ import { Job } from './modules/job/entities/job.entity';
       load: [configuration],
     }),
     
-    // Database - use the database config
+    // Database - use the database config with sync disabled
     SequelizeModule.forRootAsync({
       imports: [ConfigModule],
-      useFactory: getDatabaseConfig,
+      useFactory: (configService: ConfigService) => ({
+        dialect: 'mysql',
+        host: configService.get('DB_HOST'),
+        port: configService.get('DB_PORT'),
+        username: configService.get('DB_USERNAME'),
+        password: configService.get('DB_PASSWORD'),
+        database: configService.get('DB_NAME'),
+        models: [
+          User, 
+          Token, 
+          Resume,
+          Education,
+          Experience,
+          Attachment,
+          Company,
+          SubscriptionPlan,
+          Subscription,
+          Job
+        ],
+        autoLoadModels: true,
+        synchronize: false, // Disable auto-sync to prevent errors
+        logging: configService.get('NODE_ENV') === 'development' ? console.log : false,
+      }),
       inject: [ConfigService],
     }),
+    
+    // Import SequelizeModule for User model specifically for the seeder
+    SequelizeModule.forFeature([User]),
     
     // Modules
     UserModule,
@@ -68,41 +95,16 @@ import { Job } from './modules/job/entities/job.entity';
       provide: APP_GUARD,
       useClass: JwtAuthGuard,
     },
+    UserSeeder,
+    DatabaseInitService,
   ],
 })
 export class AppModule {
   constructor(
-    private sequelize: Sequelize
+    private sequelize: Sequelize,
+    private userSeeder: UserSeeder,
+    private databaseInitService: DatabaseInitService
   ) {
-    this.syncDatabase();
-    this.seedDatabase();
-  }
-
-  private async syncDatabase() {
-    try {
-      if (process.env.NODE_ENV === 'development' && process.env.DB_SYNC === 'true') {
-        console.log('Syncing database models...');
-        
-        // First sync without foreign key checks
-        await this.sequelize.query('SET FOREIGN_KEY_CHECKS = 0');
-        
-        // Force sync to recreate tables
-        await this.sequelize.sync({ force: true });
-        
-        // Re-enable foreign key checks
-        await this.sequelize.query('SET FOREIGN_KEY_CHECKS = 1');
-        
-        console.log('Database sync completed');
-      }
-    } catch (error) {
-      console.error('Error syncing database:', error);
-    }
-  }
-
-  private async seedDatabase() {
-    try {
-    } catch (error) {
-      console.error('Error seeding database:', error);
-    }
+    // The service will automatically initialize tables on module init
   }
 } 

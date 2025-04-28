@@ -4,7 +4,8 @@ import { User } from '../../user/entities/user.entity';
 
 export enum TokenType {
   EMAIL_VERIFICATION = 'email_verification',
-  PASSWORD_RESET = 'password_reset'
+  PASSWORD_RESET = 'password_reset',
+  REFRESH = 'refresh'
 }
 
 @Table({
@@ -45,10 +46,10 @@ export default class Token extends Model<Token> {
 
   @ForeignKey(() => User)
   @Column({
-    type: DataType.UUID,
-    allowNull: false
+    type: DataType.INTEGER,
+    allowNull: false,
   })
-  userId: string;
+  userId: number;
 
   @BelongsTo(() => User)
   user: User;

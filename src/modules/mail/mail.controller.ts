@@ -7,7 +7,7 @@ import { ConfigService } from '@nestjs/config';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
-import { UserRole } from '../user/entities/user.entity';
+import { UserType } from '../user/entities/user.entity';
 import { Public } from '../auth/decorators/public.decorator';
 
 @ApiTags('Mail')

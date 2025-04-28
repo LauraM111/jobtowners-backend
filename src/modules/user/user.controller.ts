@@ -32,7 +32,7 @@ import { User } from './entities/user.entity';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
-import { UserRole, UserStatus } from './entities/user.entity';
+import { UserType, UserStatus } from './entities/user.entity';
 import { successResponse } from '../../common/helpers/response.helper';
 import { Public } from '../auth/decorators/public.decorator';
 import { UpdateProfileDto } from './dto/update-profile.dto';
@@ -47,7 +47,7 @@ interface RequestWithUser extends ExpressRequest {
   user: {
     sub: string;
     email: string;
-    role: string;
+    userType: string;
   };
 }
 
@@ -61,8 +61,8 @@ export class UserController {
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Get current user profile' })
   @ApiResponse({ status: 200, description: 'User profile retrieved successfully' })
-  async getProfile(@Request() req) {
-    const user = await this.userService.findOne(req.user.sub);
+  async getProfile(@Request() req): Promise<any> {
+    const user = await this.userService.findById(req.user.userId);
     
     // Remove sensitive information
     const userProfile = {
@@ -70,7 +70,8 @@ export class UserController {
       firstName: user.firstName,
       lastName: user.lastName,
       email: user.email,
-      role: user.role,
+      userType: user.userType,
+      verified: user.isEmailVerified,
     };
     
     return successResponse(userProfile, 'User profile retrieved successfully');
@@ -120,7 +121,7 @@ export class UserController {
 
   @Post()
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(UserRole.ADMIN)
+  @Roles(UserType.ADMIN)
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Create a new user (Admin only)' })
   @ApiResponse({ 
@@ -151,7 +152,7 @@ export class UserController {
         data: {
           id: user.id,
           email: user.email,
-          role: user.role,
+          userType: user.userType,
           status: user.status
         }
       };
@@ -224,7 +225,7 @@ export class UserController {
 
   @Post('approve')
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(UserRole.ADMIN)
+  @Roles(UserType.ADMIN)
   @ApiBearerAuth()
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Approve or change user status (Admin only)' })
@@ -242,7 +243,7 @@ export class UserController {
 
   @Get()
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(UserRole.ADMIN)
+  @Roles(UserType.ADMIN)
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Get all users (Admin only)' })
   @ApiResponse({ 
@@ -261,7 +262,7 @@ export class UserController {
 
   @Get('pending-approval')
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(UserRole.ADMIN)
+  @Roles(UserType.ADMIN)
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Get all users pending approval (Admin only)' })
   @ApiResponse({ 
@@ -296,7 +297,7 @@ export class UserController {
 
   @Patch(':id')
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(UserRole.ADMIN)
+  @Roles(UserType.ADMIN)
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Update a user (Admin only)' })
   @ApiParam({ name: 'id', description: 'User ID' })
@@ -315,7 +316,7 @@ export class UserController {
 
   @Delete(':id')
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(UserRole.ADMIN)
+  @Roles(UserType.ADMIN)
   @ApiBearerAuth()
   @HttpCode(HttpStatus.NO_CONTENT)
   @ApiOperation({ summary: 'Delete user (Admin only)' })
@@ -338,7 +339,7 @@ export class UserController {
   async checkEmailVerificationStatus(@Param('id') id: string) {
     const user = await this.userService.findOne(id);
     return successResponse({ 
-      verified: user.emailVerified 
+      verified: user.isEmailVerified 
     }, 'Email verification status retrieved successfully');
   }
 
@@ -360,16 +361,16 @@ export class UserController {
         return successResponse(null, 'Admin user already exists');
       } catch (error) {
         // Create admin user
-        const hashedPassword = await bcrypt.hash('Admin@123', 10);
+        const hashedPassword = await bcrypt.hash('Admin@123##', 10);
         
         const adminUser = {
           firstName: 'Admin',
           lastName: 'User',
           email: 'admin@jobtowners.com',
           password: hashedPassword,
-          role: UserRole.ADMIN,
+          userType: UserType.ADMIN,
           status: UserStatus.ACTIVE,
-          emailVerified: true,
+          isEmailVerified: true,
           termsAccepted: true
         };
         
@@ -396,7 +397,7 @@ export class UserController {
       }
       
       // Reset password directly using updatePassword method
-      await this.userService.updatePassword(adminUser.id, 'Admin@123');
+      await this.userService.updatePassword(adminUser.id, 'Admin@123##');
       
       return successResponse(null, 'Admin password reset successfully');
     } catch (error) {
@@ -419,7 +420,7 @@ export class UserController {
       }
       
       // Reset password with direct SQL query
-      const hashedPassword = await bcrypt.hash('Admin@123', 10);
+      const hashedPassword = await bcrypt.hash('Admin@123##', 10);
       
       await sequelize.query(
         `UPDATE users SET password = ? WHERE email = 'admin@jobtowners.com'`,
@@ -443,21 +444,21 @@ export class UserController {
   async createNewAdmin() {
     try {
       // Create a new admin user with a different email
-      const hashedPassword = await bcrypt.hash('Admin@123', 10);
+      const hashedPassword = await bcrypt.hash('Admin@123##', 10);
       
       const adminUser = {
         firstName: 'Admin',
         lastName: 'User',
         email: 'admin2@jobtowners.com',
         password: hashedPassword,
-        role: UserRole.ADMIN,
+        userType: UserType.ADMIN,
         status: UserStatus.ACTIVE,
-        emailVerified: true,
+        isEmailVerified: true,
         termsAccepted: true
       };
       
       await this.userService.create(adminUser);
-      return successResponse({ email: 'admin2@jobtowners.com', password: 'Admin@123' }, 'New admin user created successfully');
+      return successResponse({ email: 'admin2@jobtowners.com', password: 'Admin@123##' }, 'New admin user created successfully');
     } catch (error) {
       throw new BadRequestException('Failed to create new admin user');
     }

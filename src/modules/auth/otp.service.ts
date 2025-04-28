@@ -46,7 +46,7 @@ export class OtpService {
   /**
    * Verify an OTP code
    */
-  async verifyOtp(userId: string, code: string): Promise<boolean> {
+  async verifyOtp(userId: number, code: string): Promise<boolean> {
     // Find the OTP
     const otp = await this.otpModel.findOne({
       where: {
@@ -71,8 +71,8 @@ export class OtpService {
     await otp.save();
 
     // Update user's email verification status
-    const user = await this.userService.findOne(userId);
-    user.emailVerified = true;
+    const user = await this.userService.findById(userId);
+    user.isEmailVerified = true;
     await user.save();
 
     return true;
@@ -87,5 +87,37 @@ export class OtpService {
     
     // Pass the user object to createOtp
     return this.createOtp(user);
+  }
+
+  async verifyEmail(userId: number, otp: string): Promise<boolean> {
+    // Find the OTP
+    const otpEntity = await this.otpModel.findOne({
+      where: {
+        userId,
+        code: otp,
+        used: false,
+      },
+    });
+
+    // Check if OTP exists
+    if (!otpEntity) {
+      throw new BadRequestException('Invalid OTP code');
+    }
+
+    // Check if OTP is expired
+    if (new Date() > otpEntity.expiresAt) {
+      throw new BadRequestException('OTP code has expired');
+    }
+
+    // Mark OTP as used
+    otpEntity.used = true;
+    await otpEntity.save();
+
+    // Update user's email verification status
+    const user = await this.userService.findById(userId);
+    user.isEmailVerified = true;
+    await user.save();
+
+    return true;
   }
 } 

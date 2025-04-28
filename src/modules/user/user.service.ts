@@ -1,7 +1,7 @@
 import { Injectable, NotFoundException, ConflictException, BadRequestException, Logger, Inject, forwardRef } from '@nestjs/common';
 import { InjectModel } from '@nestjs/sequelize';
 import * as bcrypt from 'bcrypt';
-import { User, UserRole, UserStatus } from './entities/user.entity';
+import { User, UserType, UserStatus } from './entities/user.entity';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
 import { CandidateRegistrationDto } from './dto/candidate-registration.dto';
@@ -99,7 +99,7 @@ export class UserService {
         email: registrationDto.email,
         phoneNumber: registrationDto.phoneNumber,
         password: registrationDto.password,
-        role: UserRole.CANDIDATE,
+        userType: UserType.CANDIDATE,
         status: UserStatus.INACTIVE, // New users are inactive until approved
         studentPermitImage: studentPermitUrl,
         proofOfEnrollmentImage: enrollmentProofUrl,
@@ -156,7 +156,7 @@ export class UserService {
         email: registrationDto.email,
         phoneNumber: registrationDto.phoneNumber,
         password: registrationDto.password,
-        role: UserRole.EMPLOYER,
+        userType: UserType.EMPLOYER,
         status: UserStatus.INACTIVE, // New users are inactive until approved
         termsAccepted: registrationDto.termsAccepted
       });
@@ -276,10 +276,16 @@ export class UserService {
     });
   }
 
-  async verifyUser(userId: string): Promise<User> {
-    const user = await this.findOne(userId);
-    user.emailVerified = true;
+  async verifyEmail(userId: number): Promise<User> {
+    const user = await this.findOne(userId.toString());
+    
+    if (!user) {
+      throw new NotFoundException('User not found');
+    }
+    
+    user.isEmailVerified = true;
     await user.save();
+    
     return user;
   }
 
@@ -372,5 +378,18 @@ export class UserService {
     await user.update(adminUpdateUserDto);
     
     return this.findOne(id);
+  }
+
+  /**
+   * Find a user by ID (numeric)
+   */
+  async findById(id: number): Promise<User> {
+    const user = await this.userModel.findByPk(id);
+
+    if (!user) {
+      throw new NotFoundException(`User with ID ${id} not found`);
+    }
+
+    return user;
   }
 } 

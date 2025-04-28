@@ -10,7 +10,7 @@ import { UpdateCompanyDto } from './dto/update-company.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
-import { UserRole } from '../user/entities/user.entity';
+import { UserType } from '../user/entities/user.entity';
 import { successResponse } from '../../common/helpers/response.helper';
 import { CompanyStatus } from './enums/company-status.enum';
 import { CompanyUpdatePipe } from './pipes/company-update.pipe';
@@ -82,7 +82,7 @@ export class CompanyController {
       const company = await this.companyService.findOne(id);
       
       // Only allow the creator or admin to update the company
-      if (company.createdBy !== req.user.sub && req.user.role !== UserRole.ADMIN) {
+      if (company.createdBy !== req.user.sub && req.user.role !== UserType.ADMIN) {
         throw new ForbiddenException('You do not have permission to update this company');
       }
       
@@ -119,7 +119,7 @@ export class CompanyController {
       const creatorId = String(company.createdBy);
       
       // Only allow the creator or admin to delete the company
-      if (creatorId !== userId && req.user.role !== UserRole.ADMIN) {
+      if (creatorId !== userId && req.user.role !== UserType.ADMIN) {
         throw new ForbiddenException('You do not have permission to delete this company');
       }
       
@@ -138,7 +138,7 @@ export class CompanyController {
   }
 
   @Patch(':id/status')
-  @Roles(UserRole.ADMIN)
+  @Roles(UserType.ADMIN)
   @UseGuards(RolesGuard)
   @ApiOperation({ summary: 'Update company status (admin only)' })
   @ApiResponse({ status: 200, description: 'Company status updated successfully' })

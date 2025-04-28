@@ -1,6 +1,6 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { IsEmail, IsEnum, IsOptional, IsPhoneNumber, IsString, Matches, MinLength, IsBoolean } from 'class-validator';
-import { UserRole, UserStatus } from '../entities/user.entity';
+import { UserType, UserStatus } from '../entities/user.entity';
 
 export class AdminUpdateUserDto {
   @ApiPropertyOptional({ example: 'John', description: 'First name' })
@@ -23,10 +23,10 @@ export class AdminUpdateUserDto {
   
   phoneNumber?: string;
 
-  @ApiProperty({ enum: UserRole, example: UserRole.CANDIDATE, description: 'User role' })
+  @ApiProperty({ enum: UserType, example: UserType.CANDIDATE, description: 'User type' })
   @IsOptional()
-  @IsEnum(UserRole, { message: 'Invalid role' })
-  role?: UserRole;
+  @IsEnum(UserType, { message: 'Invalid type' })
+  userType?: UserType;
 
   @ApiProperty({ enum: UserStatus, example: UserStatus.ACTIVE, description: 'User status' })
   @IsOptional()

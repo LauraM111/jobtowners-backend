@@ -9,7 +9,7 @@ import { UpdateResumeDto } from './dto/update-resume.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
-import { UserRole } from '../user/entities/user.entity';
+import { UserType } from '../user/entities/user.entity';
 import { successResponse } from '../../common/helpers/response.helper';
 import { PersonalDetailsDto } from './dto/personal-details.dto';
 import { UploadVideoDto } from './dto/upload-video.dto';
@@ -73,7 +73,7 @@ export class ResumeController {
   }
 
   @Get()
-  @Roles(UserRole.ADMIN)
+  @Roles(UserType.ADMIN)
   @UseGuards(RolesGuard)
   @ApiOperation({ summary: 'Get all resumes (admin only)' })
   @ApiResponse({ status: 200, description: 'Resumes retrieved successfully' })
@@ -109,7 +109,7 @@ export class ResumeController {
     const resume = await this.resumeService.findById(id);
     
     // Check if the user is the owner or an admin
-    if (resume.userId !== req.user.sub && req.user.role !== UserRole.ADMIN) {
+    if (resume.userId !== req.user.sub && req.user.role !== UserType.ADMIN) {
       throw new ForbiddenException('You do not have permission to access this resume');
     }
     

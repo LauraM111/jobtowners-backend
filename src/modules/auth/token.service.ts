@@ -1,5 +1,6 @@
 import { Injectable, Logger, NotFoundException, BadRequestException, Inject, forwardRef } from '@nestjs/common';
 import { InjectModel } from '@nestjs/sequelize';
+import { v4 as uuidv4 } from 'uuid';
 import Token, { TokenType } from './entities/token.entity';
 import { User } from '../user/entities/user.entity';
 import { MailService } from '../mail/mail.service';
@@ -106,12 +107,12 @@ export class TokenService {
     }
 
     // Get the user
-    const user = await this.userService.findOne(tokenRecord.userId);
+    const user = await this.userService.findById(tokenRecord.userId);
     
     // If it's an email verification token, update user's email verification status
     if (type === TokenType.EMAIL_VERIFICATION) {
       // Check if email is already verified
-      if (user.emailVerified) {
+      if (user.isEmailVerified) {
         // If already verified, just return the user without error
         // We'll still mark the token as used
         tokenRecord.used = true;
@@ -120,7 +121,7 @@ export class TokenService {
       }
       
       // If not verified, update the status
-      user.emailVerified = true;
+      user.isEmailVerified = true;
       await user.save();
     }
 
@@ -140,7 +141,7 @@ export class TokenService {
       const user = await this.userService.findByEmail(email);
       
       // Check if email is already verified
-      if (user.emailVerified) {
+      if (user.isEmailVerified) {
         throw new BadRequestException('Email is already verified');
       }
       
@@ -152,5 +153,115 @@ export class TokenService {
       }
       throw new NotFoundException('User not found');
     }
+  }
+
+  /**
+   * Generate an access token for a user
+   */
+  async generateAccessToken(user: User): Promise<string> {
+    const payload = {
+      sub: user.id,
+      email: user.email,
+      userId: user.id,
+    };
+    
+    // This is just a placeholder - you'll need to implement the actual JWT signing
+    return 'access_token_placeholder';
+  }
+
+  /**
+   * Generate a refresh token for a user
+   */
+  async generateRefreshToken(user: User): Promise<string> {
+    // Generate a random token
+    const refreshToken = this.generateToken();
+    
+    // Calculate expiration time (e.g., 7 days)
+    const expiresAt = new Date();
+    expiresAt.setDate(expiresAt.getDate() + 7);
+    
+    // Add REFRESH to TokenType enum if it doesn't exist
+    await this.tokenModel.create({
+      token: refreshToken,
+      userId: user.id,
+      type: 'refresh', // Use string instead of enum if REFRESH doesn't exist in TokenType
+      expiresAt: expiresAt,
+    });
+    
+    return refreshToken;
+  }
+
+  /**
+   * Verify an email verification token
+   */
+  async verifyEmailToken(token: string): Promise<User> {
+    const tokenRecord = await this.tokenModel.findOne({
+      where: { token, type: TokenType.EMAIL_VERIFICATION }
+    });
+    
+    if (!tokenRecord) {
+      throw new BadRequestException('Invalid token');
+    }
+    
+    const user = await this.userService.findById(tokenRecord.userId);
+    
+    if (user.isEmailVerified) {
+      throw new BadRequestException('Email already verified');
+    }
+    
+    user.isEmailVerified = true;
+    await user.save();
+    
+    return user;
+  }
+
+  /**
+   * Validate a password reset token
+   */
+  async validatePasswordResetToken(token: string): Promise<User> {
+    const tokenRecord = await this.tokenModel.findOne({
+      where: { token, type: TokenType.PASSWORD_RESET }
+    });
+    
+    if (!tokenRecord) {
+      throw new BadRequestException('Invalid token');
+    }
+    
+    const user = await this.userService.findById(tokenRecord.userId);
+    
+    if (!user.isEmailVerified) {
+      throw new BadRequestException('Email not verified');
+    }
+    
+    return user;
+  }
+
+  /**
+   * Find a token by its properties
+   */
+  async findOne(options: any): Promise<Token> {
+    const token = await this.tokenModel.findOne({
+      where: options,
+    });
+
+    if (!token) {
+      throw new NotFoundException('Token not found');
+    }
+
+    return token;
+  }
+
+  /**
+   * Update a token
+   */
+  async update(id: string, data: Partial<Token>): Promise<Token> {
+    const token = await this.tokenModel.findByPk(id);
+
+    if (!token) {
+      throw new NotFoundException('Token not found');
+    }
+
+    await token.update(data);
+    return token;
   }
 } 

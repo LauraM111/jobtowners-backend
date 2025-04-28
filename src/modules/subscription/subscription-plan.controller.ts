@@ -9,7 +9,7 @@ import { UpdateSubscriptionPlanDto } from './dto/update-subscription-plan.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
-import { UserRole } from '../user/entities/user.entity';
+import { UserType } from '../user/entities/user.entity';
 import { successResponse } from '../../common/helpers/response.helper';
 import { PlanStatus } from './entities/subscription-plan.entity';
 
@@ -20,7 +20,7 @@ export class SubscriptionPlanController {
 
   @Post()
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(UserRole.ADMIN)
+  @Roles(UserType.ADMIN)
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Create a new subscription plan (Admin only)' })
   @ApiResponse({ status: 201, description: 'Subscription plan created successfully' })
@@ -54,7 +54,7 @@ export class SubscriptionPlanController {
 
   @Patch(':id')
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(UserRole.ADMIN)
+  @Roles(UserType.ADMIN)
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Update a subscription plan (Admin only)' })
   @ApiResponse({ status: 200, description: 'Subscription plan updated successfully' })
@@ -72,7 +72,7 @@ export class SubscriptionPlanController {
 
   @Delete(':id')
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(UserRole.ADMIN)
+  @Roles(UserType.ADMIN)
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Delete a subscription plan (Admin only)' })
   @ApiResponse({ status: 200, description: 'Subscription plan deleted successfully' })

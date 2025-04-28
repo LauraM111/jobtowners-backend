@@ -11,7 +11,7 @@ import { UpdateJobDto } from './dto/update-job.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
-import { UserRole } from '../user/entities/user.entity';
+import { UserType } from '../user/entities/user.entity';
 import { successResponse } from '../../common/helpers/response.helper';
 import { diskStorage } from 'multer';
 import { extname } from 'path';
@@ -152,7 +152,7 @@ export class JobController {
 
   @Get('admin')
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(UserRole.ADMIN)
+  @Roles(UserType.ADMIN)
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Get all jobs (Admin only)' })
   @ApiResponse({ status: 200, description: 'Jobs retrieved successfully' })
@@ -277,7 +277,7 @@ export class JobController {
 
   @Patch(':id/verify')
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(UserRole.ADMIN)
+  @Roles(UserType.ADMIN)
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Verify a job (Admin only)' })
   @ApiResponse({ status: 200, description: 'Job verified successfully' })

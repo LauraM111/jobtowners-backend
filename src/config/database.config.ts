@@ -13,6 +13,7 @@ import { Company } from '../modules/company/entities/company.entity';
 import { SubscriptionPlan } from '../modules/subscription/entities/subscription-plan.entity';
 import { Subscription } from '../modules/subscription/entities/subscription.entity';
 import { Job } from '../modules/job/entities/job.entity';
+import { Role } from '../modules/role/entities/role.entity';
 
 dotenv.config();
 
@@ -43,44 +44,25 @@ export const getDatabaseConfig = (configService: ConfigService): SequelizeModule
   return {
     dialect: 'mysql',
     host: configService.get('DB_HOST'),
-    port: configService.get<number>('DB_PORT'),
+    port: configService.get('DB_PORT'),
     username: configService.get('DB_USERNAME'),
     password: configService.get('DB_PASSWORD'),
     database: configService.get('DB_NAME'),
     models: [
       User, 
-      Token,
-      Company, 
+      Token, 
+      Role,
+      Resume,
+      Education,
+      Experience,
+      Attachment,
+      Company,
       SubscriptionPlan,
       Subscription,
-      Job, 
-      Resume, 
-      Education, 
-      Experience, 
-      Attachment
+      Job
     ],
-    autoLoadModels: false,
-    synchronize: false, // We'll handle sync manually in AppModule
-    logging: true,
-    define: {
-      charset: 'utf8mb4',
-      collate: 'utf8mb4_unicode_ci',
-      timestamps: true,
-      // Ensure consistent UUID handling
-      defaultScope: {
-        attributes: { exclude: ['deletedAt'] }
-      }
-    },
-    dialectOptions: {
-      supportBigNumbers: true,
-      bigNumberStrings: true,
-      connectTimeout: 60000,
-    },
-    pool: {
-      max: 10,
-      min: 0,
-      acquire: 60000,
-      idle: 10000,
-    },
+    autoLoadModels: true,
+    synchronize: configService.get('NODE_ENV') === 'development',
+    logging: configService.get('NODE_ENV') === 'development' ? console.log : false,
   };
 }; 

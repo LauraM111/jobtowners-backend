@@ -31,33 +31,26 @@ export class ResumeService {
   /**
    * Create a new resume with related education, experience, and attachments
    */
-  async create(userId: string, createResumeDto: CreateResumeDto): Promise<Resume> {
+  async create(userId: number, createResumeDto: CreateResumeDto): Promise<Resume> {
     const transaction = await this.sequelize.transaction();
     
     try {
-      // Check if user already has a resume
-      const existingResume = await this.resumeModel.findOne({
-        where: { userId },
-        transaction,
-      });
-
-      if (existingResume) {
-        throw new BadRequestException('User already has a resume. Use update instead.');
-      }
-
-      // Create resume
+      // Extract education, experiences, and attachments from the DTO
+      const { education, experiences, attachments, ...resumeData } = createResumeDto;
+      
+      // Create resume with type assertion to avoid TypeScript errors
       const resume = await this.resumeModel.create(
         {
-          ...createResumeDto,
+          ...resumeData,
           userId,
-        },
+        } as unknown as Partial<Resume>,
         { transaction }
       );
 
       // Create education records if provided
-      if (createResumeDto.education && createResumeDto.education.length > 0) {
+      if (education && education.length > 0) {
         await Promise.all(
-          createResumeDto.education.map(edu => 
+          education.map(edu => 
             this.educationModel.create(
               {
                 ...edu,
@@ -70,9 +63,9 @@ export class ResumeService {
       }
 
       // Create experience records if provided
-      if (createResumeDto.experiences && createResumeDto.experiences.length > 0) {
+      if (experiences && experiences.length > 0) {
         await Promise.all(
-          createResumeDto.experiences.map(exp => 
+          experiences.map(exp => 
             this.experienceModel.create(
               {
                 ...exp,
@@ -85,9 +78,9 @@ export class ResumeService {
       }
 
       // Create attachment records if provided
-      if (createResumeDto.attachments && createResumeDto.attachments.length > 0) {
+      if (attachments && attachments.length > 0) {
         await Promise.all(
-          createResumeDto.attachments.map(att => 
+          attachments.map(att => 
             this.attachmentModel.create(
               {
                 ...att,
@@ -126,7 +119,7 @@ export class ResumeService {
   /**
    * Find a user's resume
    */
-  async findOne(userId: string): Promise<Resume> {
+  async findOne(userId: number): Promise<Resume> {
     const resume = await this.resumeModel.findOne({
       where: { userId },
       include: [
@@ -172,7 +165,7 @@ export class ResumeService {
   /**
    * Update a user's resume
    */
-  async update(userId: string, updateResumeDto: UpdateResumeDto): Promise<Resume> {
+  async update(userId: number, updateResumeDto: UpdateResumeDto): Promise<Resume> {
     const transaction = await this.sequelize.transaction();
     
     try {
@@ -187,7 +180,7 @@ export class ResumeService {
       }
 
       // Update resume basic info
-      await resume.update(updateResumeDto, { transaction });
+      await resume.update(updateResumeDto as any, { transaction });
 
       // Handle education updates if provided
       if (updateResumeDto.education) {
@@ -274,7 +267,7 @@ export class ResumeService {
   /**
    * Remove a user's resume
    */
-  async remove(userId: string): Promise<void> {
+  async remove(userId: number): Promise<void> {
     const transaction = await this.sequelize.transaction();
     
     try {
@@ -316,7 +309,7 @@ export class ResumeService {
   /**
    * Get a user's personal details with all resume data
    */
-  async getPersonalDetails(userId: string): Promise<any | null> {
+  async getPersonalDetails(userId: number): Promise<any | null> {
     const resume = await this.resumeModel.findOne({
       where: { userId },
       include: [
@@ -372,7 +365,7 @@ export class ResumeService {
   /**
    * Update a user's personal details
    */
-  async updatePersonalDetails(userId: string, personalDetailsDto: PersonalDetailsDto): Promise<PersonalDetailsDto> {
+  async updatePersonalDetails(userId: number, personalDetailsDto: PersonalDetailsDto): Promise<PersonalDetailsDto> {
     const transaction = await this.sequelize.transaction();
     
     try {
@@ -409,7 +402,7 @@ export class ResumeService {
   /**
    * Update a user's resume video
    */
-  async updateVideo(userId: string, videoUrl: string): Promise<Resume> {
+  async updateVideo(userId: number, videoUrl: string): Promise<Resume> {
     const transaction = await this.sequelize.transaction();
     
     try {
@@ -446,7 +439,7 @@ export class ResumeService {
   /**
    * Update a user's resume CV document
    */
-  async updateCv(userId: string, cvUrl: string): Promise<Resume> {
+  async updateCv(userId: number, cvUrl: string): Promise<Resume> {
     const transaction = await this.sequelize.transaction();
     
     try {
@@ -483,7 +476,7 @@ export class ResumeService {
   /**
    * Delete a user's resume video
    */
-  async deleteVideo(userId: string): Promise<Resume> {
+  async deleteVideo(userId: number): Promise<Resume> {
     const transaction = await this.sequelize.transaction();
     
     try {
@@ -513,7 +506,7 @@ export class ResumeService {
   /**
    * Delete a user's resume CV document
    */
-  async deleteCv(userId: string): Promise<Resume> {
+  async deleteCv(userId: number): Promise<Resume> {
     const transaction = await this.sequelize.transaction();
     
     try {
@@ -543,7 +536,7 @@ export class ResumeService {
   /**
    * Add an attachment to a user's resume
    */
-  async addAttachment(userId: string, createAttachmentDto: CreateAttachmentDto): Promise<Attachment> {
+  async addAttachment(userId: number, createAttachmentDto: CreateAttachmentDto): Promise<Attachment> {
     const transaction = await this.sequelize.transaction();
     
     try {
@@ -581,7 +574,7 @@ export class ResumeService {
   /**
    * Get all attachments for a user's resume
    */
-  async getAttachments(userId: string): Promise<Attachment[]> {
+  async getAttachments(userId: number): Promise<Attachment[]> {
     // Find the resume
     const resume = await this.resumeModel.findOne({
       where: { userId },
@@ -598,7 +591,7 @@ export class ResumeService {
   /**
    * Delete an attachment from a user's resume
    */
-  async deleteAttachment(userId: string, attachmentId: string): Promise<void> {
+  async deleteAttachment(userId: number, attachmentId: string): Promise<void> {
     const transaction = await this.sequelize.transaction();
     
     try {
@@ -638,7 +631,7 @@ export class ResumeService {
   /**
    * Add education to a user's resume
    */
-  async addEducation(userId: string, createEducationDto: CreateEducationDto): Promise<Education> {
+  async addEducation(userId: number, createEducationDto: CreateEducationDto): Promise<Education> {
     const transaction = await this.sequelize.transaction();
     
     try {
@@ -676,7 +669,7 @@ export class ResumeService {
   /**
    * Get all education entries for a user's resume
    */
-  async getEducation(userId: string): Promise<Education[]> {
+  async getEducation(userId: number): Promise<Education[]> {
     // Find the resume
     const resume = await this.resumeModel.findOne({
       where: { userId },
@@ -693,7 +686,7 @@ export class ResumeService {
   /**
    * Update an education entry
    */
-  async updateEducation(userId: string, educationId: string, updateEducationDto: CreateEducationDto): Promise<Education> {
+  async updateEducation(userId: number, educationId: string, updateEducationDto: CreateEducationDto): Promise<Education> {
     const transaction = await this.sequelize.transaction();
     
     try {
@@ -736,7 +729,7 @@ export class ResumeService {
   /**
    * Delete an education entry
    */
-  async deleteEducation(userId: string, educationId: string): Promise<void> {
+  async deleteEducation(userId: number, educationId: string): Promise<void> {
     const transaction = await this.sequelize.transaction();
     
     try {
@@ -776,7 +769,7 @@ export class ResumeService {
   /**
    * Add work experience to a user's resume
    */
-  async addExperience(userId: string, createExperienceDto: CreateExperienceDto): Promise<Experience> {
+  async addExperience(userId: number, createExperienceDto: CreateExperienceDto): Promise<Experience> {
     const transaction = await this.sequelize.transaction();
     
     try {
@@ -814,7 +807,7 @@ export class ResumeService {
   /**
    * Get all work experience entries for a user's resume
    */
-  async getExperience(userId: string): Promise<Experience[]> {
+  async getExperience(userId: number): Promise<Experience[]> {
     // Find the resume
     const resume = await this.resumeModel.findOne({
       where: { userId },
@@ -831,7 +824,7 @@ export class ResumeService {
   /**
    * Update a work experience entry
    */
-  async updateExperience(userId: string, experienceId: string, updateExperienceDto: CreateExperienceDto): Promise<Experience> {
+  async updateExperience(userId: number, experienceId: string, updateExperienceDto: CreateExperienceDto): Promise<Experience> {
     const transaction = await this.sequelize.transaction();
     
     try {
@@ -874,7 +867,7 @@ export class ResumeService {
   /**
    * Delete a work experience entry
    */
-  async deleteExperience(userId: string, experienceId: string): Promise<void> {
+  async deleteExperience(userId: number, experienceId: string): Promise<void> {
     const transaction = await this.sequelize.transaction();
     
     try {
