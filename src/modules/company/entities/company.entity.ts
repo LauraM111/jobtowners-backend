@@ -21,10 +21,10 @@ export class Company extends Model {
 
   @ForeignKey(() => User)
   @Column({
-    type: DataType.UUID,
+    type: DataType.INTEGER,
     allowNull: false
   })
-  userId: string;
+  userId: number;
 
   @BelongsTo(() => User)
   user: User;
@@ -191,10 +191,10 @@ export class Company extends Model {
   status: CompanyStatus;
 
   @Column({
-    type: DataType.UUID,
+    type: DataType.INTEGER,
     allowNull: false,
   })
-  createdBy: string;
+  createdBy: number;
 
   @Column({
     type: DataType.UUID,

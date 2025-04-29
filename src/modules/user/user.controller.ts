@@ -280,19 +280,21 @@ export class UserController {
   }
 
   @Get(':id')
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserType.ADMIN)
   @ApiBearerAuth()
-  @ApiOperation({ summary: 'Get user by ID' })
+  @ApiOperation({ summary: 'Get a user by ID (Admin only)' })
+  @ApiParam({ name: 'id', description: 'User ID' })
   @ApiResponse({ 
     status: 200, 
-    description: 'The user has been found.',
+    description: 'The user has been successfully retrieved.',
     type: User 
   })
   @ApiResponse({ status: 404, description: 'User not found.' })
   async findOne(@Param('id') id: string) {
     const user = await this.userService.findOne(id);
     const { password, ...result } = user.toJSON();
-    return successResponse(result, 'User found');
+    return successResponse(result, 'User retrieved successfully');
   }
 
   @Patch(':id')

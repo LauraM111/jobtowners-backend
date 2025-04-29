@@ -20,38 +20,20 @@ export class CompanyService {
    * Create a new company
    */
   async create(userId: string, createCompanyDto: CreateCompanyDto): Promise<Company> {
-    const transaction = await this.sequelize.transaction();
-    
     try {
-      // Generate slug if not provided
-      if (!createCompanyDto.slug) {
-        createCompanyDto.slug = this.generateSlug(createCompanyDto.companyName);
-      }
+      // Ensure userId is set
+      console.log('Creating company with userId:', userId);
       
-      // Check if slug is unique
-      const existingCompany = await this.companyModel.findOne({
-        where: { slug: createCompanyDto.slug },
-        transaction,
+      // Create the company with userId and createdBy set to the current user
+      const company = await this.companyModel.create({
+        ...createCompanyDto,
+        userId: userId,
+        createdBy: userId
       });
       
-      if (existingCompany) {
-        throw new BadRequestException(`Company with slug "${createCompanyDto.slug}" already exists`);
-      }
-      
-      // Create the company
-      const company = await this.companyModel.create(
-        {
-          ...createCompanyDto,
-          createdBy: userId,
-          updatedBy: userId,
-        },
-        { transaction }
-      );
-      
-      await transaction.commit();
       return company;
     } catch (error) {
-      await transaction.rollback();
+      console.error('Error creating company:', error);
       throw error;
     }
   }
@@ -320,35 +302,28 @@ export class CompanyService {
   }
 
   /**
-   * Soft delete a company
+   * Remove a company
    */
   async remove(id: string): Promise<void> {
-    const transaction = await this.sequelize.transaction();
+    const company = await this.findOne(id);
+    
+    if (!company) {
+      throw new NotFoundException(`Company with ID ${id} not found`);
+    }
     
     try {
-      const company = await this.companyModel.findByPk(id, { transaction });
-      
-      if (!company) {
-        throw new NotFoundException(`Company with ID ${id} not found`);
-      }
-      
-      try {
-        // Try soft delete first
-        await company.update({ deletedAt: new Date() }, { transaction });
-      } catch (error) {
-        // If deletedAt column doesn't exist, fall back to hard delete
-        if (error.message && error.message.includes('deletedAt')) {
-          console.warn('deletedAt column not found, performing hard delete instead');
-          await company.destroy({ transaction });
-        } else {
-          throw error;
-        }
-      }
-      
-      await transaction.commit();
+      // Try soft delete first (if deletedAt column exists)
+      await this.companyModel.update(
+        { deletedAt: new Date() },
+        { where: { id } }
+      );
     } catch (error) {
-      await transaction.rollback();
-      throw error;
+      // If soft delete fails (e.g., no deletedAt column), try hard delete
+      if (error.message && error.message.includes('deletedAt')) {
+        await this.companyModel.destroy({ where: { id } });
+      } else {
+        throw error;
+      }
     }
   }
 
@@ -397,10 +372,10 @@ export class CompanyService {
    * Find all companies created by a specific user
    */
   async findByUserId(userId: string, query: any = {}): Promise<Company[]> {
-    const { status, limit = 10, offset = 0 } = query;
+    const { status, limit, offset } = query;
     
     const whereClause: any = {
-      createdBy: userId,
+      userId: userId,
     };
     
     // Add condition to exclude deleted companies
@@ -413,24 +388,42 @@ export class CompanyService {
         whereClause.status = status;
       }
       
-      return await this.companyModel.findAll({
+      const options: any = {
         where: whereClause,
-        limit: parseInt(limit),
-        offset: parseInt(offset),
         order: [['createdAt', 'DESC']],
-      });
+      };
+      
+      // Add pagination if provided
+      if (limit) {
+        options.limit = parseInt(limit);
+      }
+      
+      if (offset) {
+        options.offset = parseInt(offset);
+      }
+      
+      return await this.companyModel.findAll(options);
     } catch (error) {
       // If the error is about the deletedAt column, try again without it
       if (error.message && error.message.includes('deletedAt')) {
         console.warn('deletedAt column not found, querying without soft delete filter');
         delete whereClause.deletedAt;
         
-        return await this.companyModel.findAll({
+        const options: any = {
           where: whereClause,
-          limit: parseInt(limit),
-          offset: parseInt(offset),
           order: [['createdAt', 'DESC']],
-        });
+        };
+        
+        // Add pagination if provided
+        if (limit) {
+          options.limit = parseInt(limit);
+        }
+        
+        if (offset) {
+          options.offset = parseInt(offset);
+        }
+        
+        return await this.companyModel.findAll(options);
       }
       throw error;
     }

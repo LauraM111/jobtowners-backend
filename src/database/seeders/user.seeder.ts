@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { InjectModel } from '@nestjs/sequelize';
 import * as bcrypt from 'bcrypt';
+import { v4 as uuidv4 } from 'uuid';
 import { User, UserType } from '../../modules/user/entities/user.entity';
 
 @Injectable()
@@ -17,6 +18,7 @@ export class UserSeeder {
       // Create users if they don't exist
       const users = [
         {
+          id: uuidv4(),
           email: 'admin@jobtowners.com',
           password: 'Admin@123##',
           firstName: 'Admin',
@@ -26,6 +28,7 @@ export class UserSeeder {
           isActive: true,
         },
         {
+          id: uuidv4(),
           email: 'user@jobtowners.com',
           password: 'Admin@123##',
           firstName: 'Regular',
@@ -35,6 +38,7 @@ export class UserSeeder {
           isActive: true,
         },
         {
+          id: uuidv4(),
           email: 'candidate@jobtowners.com',
           password: 'Admin@123##',
           firstName: 'Job',
@@ -44,6 +48,7 @@ export class UserSeeder {
           isActive: true,
         },
         {
+          id: uuidv4(),
           email: 'employer@jobtowners.com',
           password: 'Admin@123##',
           firstName: 'Company',
@@ -67,6 +72,7 @@ export class UserSeeder {
 
           // Create user
           await this.userModel.create({
+            id: userData.id,
             email: userData.email,
             password: hashedPassword,
             firstName: userData.firstName,

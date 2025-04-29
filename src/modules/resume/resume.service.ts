@@ -313,9 +313,19 @@ export class ResumeService {
     const resume = await this.resumeModel.findOne({
       where: { userId },
       include: [
-        { model: Education },
-        { model: Experience },
-        { model: Attachment }
+        {
+          model: this.educationModel,
+          as: 'education',
+          attributes: ['id', 'institution', 'degree', 'fieldOfStudy', 'startDate', 'endDate', 'description']
+        },
+        {
+          model: this.experienceModel,
+          as: 'experiences'
+        },
+        {
+          model: this.attachmentModel,
+          as: 'attachments'
+        }
       ]
     });
 

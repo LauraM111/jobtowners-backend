@@ -15,73 +15,72 @@ export class TokenService {
   constructor(
     @InjectModel(Token)
     private tokenModel: typeof Token,
+    private mailService: MailService,
     @Inject(forwardRef(() => UserService))
     private userService: UserService,
-    private mailService: MailService,
     private configService: ConfigService,
   ) {}
 
   /**
-   * Generate a random token
+   * Create a verification token for a user
    */
-  private generateToken(): string {
-    return crypto.randomBytes(32).toString('hex');
+  async createVerificationToken(user: User): Promise<Token> {
+    try {
+      // Generate a random token
+      const token = this.generateToken();
+      
+      // Calculate expiration time (24 hours)
+      const expiresAt = new Date();
+      expiresAt.setHours(expiresAt.getHours() + 24);
+      
+      // Create token record
+      const tokenRecord = await this.tokenModel.create({
+        token,
+        type: TokenType.EMAIL_VERIFICATION,
+        expiresAt,
+        userId: user.id,
+      });
+      
+      // Send verification email
+      const verificationUrl = `${this.configService.get('FRONTEND_URL')}/verify-email?token=${token}`;
+      await this.mailService.sendVerificationEmail(user.email, user.firstName, verificationUrl);
+      
+      return tokenRecord;
+    } catch (error) {
+      this.logger.error(`Error creating verification token: ${error.message}`, error.stack);
+      throw new BadRequestException('Failed to create verification token');
+    }
   }
 
   /**
-   * Create a new verification token for a user
+   * Create a password reset token for a user
    */
-  async createVerificationToken(user: User, expiresInHours: number = 24): Promise<Token> {
-    // Generate a random token
-    const token = this.generateToken();
-    
-    // Calculate expiration time
-    const expiresAt = new Date();
-    expiresAt.setHours(expiresAt.getHours() + expiresInHours);
-    
-    // Create and save the token
-    const verificationToken = await this.tokenModel.create({
-      token,
-      type: TokenType.EMAIL_VERIFICATION,
-      expiresAt,
-      userId: user.id,
-    });
-
-    // Send verification email
-    const frontendUrl = this.configService.get<string>('FRONTEND_URL');
-    const verificationUrl = `${frontendUrl}/verify-email?token=${token}`;
-    
-    await this.mailService.sendVerificationEmail(user.email, user.firstName, verificationUrl);
-    
-    return verificationToken;
-  }
-
-  /**
-   * Create a password reset token
-   */
-  async createPasswordResetToken(user: User, expiresInHours: number = 1): Promise<Token> {
-    // Generate a random token
-    const token = this.generateToken();
-    
-    // Calculate expiration time
-    const expiresAt = new Date();
-    expiresAt.setHours(expiresAt.getHours() + expiresInHours);
-    
-    // Create and save the token
-    const resetToken = await this.tokenModel.create({
-      token,
-      type: TokenType.PASSWORD_RESET,
-      expiresAt,
-      userId: user.id,
-    });
-
-    // Send password reset email
-    const frontendUrl = this.configService.get<string>('FRONTEND_URL');
-    const resetUrl = `${frontendUrl}/reset-password?token=${token}`;
-    
-    await this.mailService.sendPasswordResetEmail(user.email, user.firstName, resetUrl);
-    
-    return resetToken;
+  async createPasswordResetToken(user: User): Promise<Token> {
+    try {
+      // Generate a random token
+      const token = this.generateToken();
+      
+      // Calculate expiration time (1 hour)
+      const expiresAt = new Date();
+      expiresAt.setHours(expiresAt.getHours() + 1);
+      
+      // Create token record
+      const tokenRecord = await this.tokenModel.create({
+        token,
+        type: TokenType.PASSWORD_RESET,
+        expiresAt,
+        userId: user.id,
+      });
+      
+      // Send password reset email
+      const resetUrl = `${this.configService.get('FRONTEND_URL')}/reset-password?token=${token}`;
+      await this.mailService.sendPasswordResetEmail(user.email, user.firstName, resetUrl);
+      
+      return tokenRecord;
+    } catch (error) {
+      this.logger.error(`Error creating password reset token: ${error.message}`, error.stack);
+      throw new BadRequestException('Failed to create password reset token');
+    }
   }
 
   /**
@@ -263,5 +262,12 @@ export class TokenService {
 
     await token.update(data);
     return token;
+  }
+
+  /**
+   * Generate a random token
+   */
+  private generateToken(): string {
+    return crypto.randomBytes(32).toString('hex');
   }
 } 

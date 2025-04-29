@@ -1,5 +1,4 @@
-import { Column, Model, Table, DataType, ForeignKey, BelongsTo, BeforeCreate } from 'sequelize-typescript';
-import { v4 as uuidv4 } from 'uuid';
+import { Column, Model, Table, DataType, ForeignKey, BelongsTo } from 'sequelize-typescript';
 import { Resume } from './resume.entity';
 
 @Table({
@@ -8,11 +7,11 @@ import { Resume } from './resume.entity';
 })
 export class Experience extends Model {
   @Column({
-    type: DataType.UUID,
-    defaultValue: DataType.UUIDV4,
+    type: DataType.INTEGER,
+    autoIncrement: true,
     primaryKey: true,
   })
-  id: string;
+  id: number;
 
   @Column({
     type: DataType.STRING,
@@ -27,16 +26,16 @@ export class Experience extends Model {
   companyName: string;
 
   @Column({
-    type: DataType.INTEGER,
-    allowNull: false
-  })
-  fromYear: number;
-
-  @Column({
-    type: DataType.INTEGER,
+    type: DataType.DATE,
     allowNull: true
   })
-  toYear: number;
+  startDate: Date;
+
+  @Column({
+    type: DataType.DATE,
+    allowNull: true
+  })
+  endDate: Date;
 
   @Column({
     type: DataType.TEXT,
@@ -46,18 +45,11 @@ export class Experience extends Model {
 
   @ForeignKey(() => Resume)
   @Column({
-    type: DataType.UUID,
+    type: DataType.INTEGER,
     allowNull: false
   })
-  resumeId: string;
+  resumeId: number;
 
   @BelongsTo(() => Resume)
   resume: Resume;
-
-  @BeforeCreate
-  static generateId(instance: Experience) {
-    if (!instance.id) {
-      instance.id = uuidv4();
-    }
-  }
 } 

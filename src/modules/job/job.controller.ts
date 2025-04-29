@@ -64,30 +64,7 @@ export class JobController {
     }
   }
 
-  @Post(':id/additional-attachments')
-  @UseGuards(JwtAuthGuard)
-  @ApiBearerAuth()
-  @ApiOperation({ summary: 'Upload additional attachments for a job' })
-  @ApiResponse({ status: 200, description: 'Attachments uploaded successfully' })
-  @ApiConsumes('multipart/form-data')
-  @UseInterceptors(FilesInterceptor('attachments', 5, {
-    storage: diskStorage({
-      destination: './uploads/jobs',
-      filename: (req, file, cb) => {
-        const randomName = uuidv4();
-        return cb(null, `${randomName}${extname(file.originalname)}`);
-      },
-    }),
-    fileFilter: (req, file, cb) => {
-      if (!file.originalname.match(/\.(pdf|doc|docx|txt|jpg|jpeg|png)$/)) {
-        return cb(new BadRequestException('Only PDF, DOC, DOCX, TXT, JPG, JPEG, and PNG files are allowed!'), false);
-      }
-      cb(null, true);
-    },
-    limits: {
-      fileSize: 5 * 1024 * 1024, // 5MB per file
-    },
-  }))
+  
   async uploadAdditionalAttachments(
     @Request() req,
     @Param('id') id: string,

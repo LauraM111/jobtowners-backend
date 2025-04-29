@@ -1,5 +1,4 @@
-import { Column, Model, Table, DataType, ForeignKey, BelongsTo, BeforeCreate } from 'sequelize-typescript';
-import { v4 as uuidv4 } from 'uuid';
+import { Column, Model, Table, DataType, ForeignKey, BelongsTo } from 'sequelize-typescript';
 import { Resume } from './resume.entity';
 
 @Table({
@@ -8,11 +7,11 @@ import { Resume } from './resume.entity';
 })
 export class Attachment extends Model {
   @Column({
-    type: DataType.UUID,
-    defaultValue: DataType.UUIDV4,
+    type: DataType.INTEGER,
+    autoIncrement: true,
     primaryKey: true,
   })
-  id: string;
+  id: number;
 
   @Column({
     type: DataType.STRING,
@@ -28,18 +27,11 @@ export class Attachment extends Model {
 
   @ForeignKey(() => Resume)
   @Column({
-    type: DataType.UUID,
+    type: DataType.INTEGER,
     allowNull: false
   })
-  resumeId: string;
+  resumeId: number;
 
   @BelongsTo(() => Resume)
   resume: Resume;
-
-  @BeforeCreate
-  static generateId(instance: Attachment) {
-    if (!instance.id) {
-      instance.id = uuidv4();
-    }
-  }
 } 

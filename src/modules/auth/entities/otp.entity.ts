@@ -8,7 +8,7 @@ import { User } from '../../user/entities/user.entity';
 })
 export default class OTP extends Model {
   @Column({
-    type: DataType.STRING(36),
+    type: DataType.UUID,
     primaryKey: true,
     defaultValue: DataType.UUIDV4
   })
@@ -35,7 +35,7 @@ export default class OTP extends Model {
 
   @ForeignKey(() => User)
   @Column({
-    type: DataType.STRING(36),
+    type: DataType.UUID,
     allowNull: false
   })
   userId: string;

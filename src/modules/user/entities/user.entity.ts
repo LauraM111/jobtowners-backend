@@ -2,6 +2,7 @@ import { Column, Model, Table, DataType, BeforeCreate, BeforeUpdate, HasMany, Be
 import * as bcrypt from 'bcrypt';
 import { ApiProperty } from '@nestjs/swagger';
 import Token from '../../auth/entities/token.entity';
+import { v4 as uuidv4 } from 'uuid';
 
 export enum UserType {
   ADMIN = 'admin',
@@ -23,11 +24,11 @@ export enum UserStatus {
 })
 export class User extends Model {
   @Column({
-    type: DataType.INTEGER,
-    autoIncrement: true,
+    type: DataType.UUID,
     primaryKey: true,
+    defaultValue: DataType.UUIDV4
   })
-  id: number;
+  id: string;
 
   @ApiProperty({ example: 'John', description: 'First name' })
   @Column({
@@ -155,6 +156,13 @@ export class User extends Model {
 
   @HasMany(() => Token)
   tokens: Token[];
+
+  @BeforeCreate
+  static generateId(instance: User) {
+    if (!instance.id) {
+      instance.id = uuidv4();
+    }
+  }
 
   @BeforeCreate
   @BeforeUpdate

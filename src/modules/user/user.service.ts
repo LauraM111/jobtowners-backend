@@ -229,14 +229,21 @@ export class UserService {
   /**
    * Find a user by ID
    */
-  async findOne(id: string): Promise<User> {
+  async findById(id: string): Promise<User> {
     const user = await this.userModel.findByPk(id);
-
+    
     if (!user) {
       throw new NotFoundException(`User with ID ${id} not found`);
     }
-
+    
     return user;
+  }
+
+  /**
+   * Find a user by ID (alias for findById)
+   */
+  async findOne(id: string): Promise<User> {
+    return this.findById(id);
   }
 
   /**
@@ -378,18 +385,5 @@ export class UserService {
     await user.update(adminUpdateUserDto);
     
     return this.findOne(id);
-  }
-
-  /**
-   * Find a user by ID (numeric)
-   */
-  async findById(id: number): Promise<User> {
-    const user = await this.userModel.findByPk(id);
-
-    if (!user) {
-      throw new NotFoundException(`User with ID ${id} not found`);
-    }
-
-    return user;
   }
 } 

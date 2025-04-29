@@ -110,7 +110,7 @@ export class AuthService {
   /**
    * Reset a user's password
    */
-  async resetPassword(userId: number, newPassword: string): Promise<void> {
+  async resetPassword(userId: string, newPassword: string): Promise<void> {
     const user = await this.userService.findById(userId);
     
     if (!user) {

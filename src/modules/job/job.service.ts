@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException, BadRequestException, Logger } from '@nestjs/common';
+import { Injectable, NotFoundException, BadRequestException, Logger, ForbiddenException } from '@nestjs/common';
 import { InjectModel } from '@nestjs/sequelize';
 import { Sequelize } from 'sequelize-typescript';
 import { Job, JobStatus, VerificationStatus } from './entities/job.entity';
@@ -71,8 +71,8 @@ export class JobService {
         }
         
         // Check if company belongs to user
-        if (company.userId !== userId) {
-          throw new BadRequestException('You can only associate jobs with your own companies');
+        if (company.userId.toString() !== userId) {
+          throw new ForbiddenException('You do not have permission to create a job for this company');
         }
       }
       
@@ -106,7 +106,7 @@ export class JobService {
       city,
       industry,
       search,
-      limit = 10,
+      limit,
       offset = 0,
       userId,
       companyId
@@ -180,10 +180,8 @@ export class JobService {
     }
     
     // Get jobs with pagination
-    const jobs = await this.jobModel.findAll({
+    const options: any = {
       where: whereClause,
-      limit: parseInt(limit),
-      offset: parseInt(offset),
       order: [['createdAt', 'DESC']],
       include: [
         {
@@ -195,7 +193,24 @@ export class JobService {
           attributes: ['id', 'companyName', 'logoUrl', 'website']
         }
       ]
-    });
+    };
+    
+    // Add pagination if provided and valid
+    if (limit !== undefined && limit !== null) {
+      const parsedLimit = parseInt(limit);
+      if (!isNaN(parsedLimit) && parsedLimit > 0) {
+        options.limit = parsedLimit;
+      }
+    }
+    
+    if (offset !== undefined && offset !== null) {
+      const parsedOffset = parseInt(offset);
+      if (!isNaN(parsedOffset) && parsedOffset >= 0) {
+        options.offset = parsedOffset;
+      }
+    }
+    
+    const jobs = await this.jobModel.findAll(options);
     
     return { jobs, total };
   }

@@ -1,5 +1,4 @@
-import { Column, Model, Table, DataType, ForeignKey, BelongsTo, BeforeCreate } from 'sequelize-typescript';
-import { v4 as uuidv4 } from 'uuid';
+import { Column, Model, Table, DataType, ForeignKey, BelongsTo } from 'sequelize-typescript';
 import { Resume } from './resume.entity';
 
 @Table({
@@ -8,35 +7,41 @@ import { Resume } from './resume.entity';
 })
 export class Education extends Model {
   @Column({
-    type: DataType.UUID,
-    defaultValue: DataType.UUIDV4,
+    type: DataType.INTEGER,
+    autoIncrement: true,
     primaryKey: true,
   })
-  id: string;
+  id: number;
 
   @Column({
     type: DataType.STRING,
     allowNull: false
   })
-  degreeName: string;
+  institution: string;
 
   @Column({
     type: DataType.STRING,
     allowNull: false
   })
-  universityName: string;
+  degree: string;
 
   @Column({
-    type: DataType.INTEGER,
-    allowNull: false
-  })
-  fromYear: number;
-
-  @Column({
-    type: DataType.INTEGER,
+    type: DataType.STRING,
     allowNull: true
   })
-  toYear: number;
+  fieldOfStudy: string;
+
+  @Column({
+    type: DataType.DATE,
+    allowNull: true
+  })
+  startDate: Date;
+
+  @Column({
+    type: DataType.DATE,
+    allowNull: true
+  })
+  endDate: Date;
 
   @Column({
     type: DataType.TEXT,
@@ -46,18 +51,11 @@ export class Education extends Model {
 
   @ForeignKey(() => Resume)
   @Column({
-    type: DataType.UUID,
+    type: DataType.INTEGER,
     allowNull: false
   })
-  resumeId: string;
+  resumeId: number;
 
   @BelongsTo(() => Resume)
   resume: Resume;
-
-  @BeforeCreate
-  static generateId(instance: Education) {
-    if (!instance.id) {
-      instance.id = uuidv4();
-    }
-  }
 } 

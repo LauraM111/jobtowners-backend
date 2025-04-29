@@ -1,16 +1,17 @@
-import { Module } from '@nestjs/common';
+import { Module, forwardRef } from '@nestjs/common';
 import { SequelizeModule } from '@nestjs/sequelize';
-import { OtpService } from './otp.service';
-import { User } from '../user/entities/user.entity';
-import { MailModule } from '../mail/mail.module';
+import { OTPService } from './otp.service';
 import OTP from './entities/otp.entity';
+import { UserModule } from '../user/user.module';
+import { MailModule } from '../mail/mail.module';
 
 @Module({
   imports: [
-    SequelizeModule.forFeature([OTP, User]),
+    SequelizeModule.forFeature([OTP]),
+    forwardRef(() => UserModule),
     MailModule,
   ],
-  providers: [OtpService],
-  exports: [OtpService],
+  providers: [OTPService],
+  exports: [OTPService],
 })
-export class OtpModule {} 
+export class OTPModule {} 

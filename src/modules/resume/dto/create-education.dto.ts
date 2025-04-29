@@ -1,45 +1,34 @@
-import { ApiProperty } from '@nestjs/swagger';
-import { IsString, IsNotEmpty, IsOptional } from 'class-validator';
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { IsNotEmpty, IsString, IsOptional, IsDateString } from 'class-validator';
 
 export class CreateEducationDto {
-  @ApiProperty({ 
-    description: 'Name of the degree', 
-    example: 'Bachelor of Science in Computer Science' 
-  })
-  @IsString()
+  @ApiProperty({ example: 'Harvard University', description: 'Name of the institution' })
   @IsNotEmpty()
-  degreeName: string;
-
-  @ApiProperty({ 
-    description: 'Name of the university or institution', 
-    example: 'Stanford University' 
-  })
   @IsString()
+  institution: string;
+
+  @ApiProperty({ example: 'Bachelor of Science', description: 'Degree obtained' })
   @IsNotEmpty()
-  universityName: string;
-
-  @ApiProperty({ 
-    description: 'Start year of education', 
-    example: '2015' 
-  })
   @IsString()
-  @IsNotEmpty()
-  fromYear: string;
+  degree: string;
 
-  @ApiProperty({ 
-    description: 'End year of education (or "Present" for ongoing)', 
-    example: '2019' 
-  })
-  @IsString()
-  @IsNotEmpty()
-  toYear: string;
-
-  @ApiProperty({ 
-    description: 'Description of the education', 
-    example: 'Graduated with honors. Specialized in Artificial Intelligence.',
-    required: false
-  })
-  @IsString()
+  @ApiPropertyOptional({ example: 'Computer Science', description: 'Field of study' })
   @IsOptional()
+  @IsString()
+  fieldOfStudy?: string;
+
+  @ApiPropertyOptional({ example: '2018-09-01', description: 'Start date (YYYY-MM-DD)' })
+  @IsOptional()
+  @IsDateString()
+  startDate?: string;
+
+  @ApiPropertyOptional({ example: '2022-06-30', description: 'End date (YYYY-MM-DD)' })
+  @IsOptional()
+  @IsDateString()
+  endDate?: string;
+
+  @ApiPropertyOptional({ example: 'Graduated with honors', description: 'Additional description' })
+  @IsOptional()
+  @IsString()
   description?: string;
 } 

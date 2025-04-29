@@ -29,11 +29,12 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
       throw new UnauthorizedException('User not found');
     }
     
-    // Return the user ID as 'sub' to match what's stored in the company's createdBy field
+    // Make sure we're returning the user ID as 'sub'
     return { 
-      sub: payload.sub, 
+      userId: payload.sub, // Add this for backward compatibility
+      sub: payload.sub,    // This is the standard JWT claim for subject (user ID)
       email: payload.email,
-      role: payload.role,
+      userType: payload.userType
     };
   }
 } 
