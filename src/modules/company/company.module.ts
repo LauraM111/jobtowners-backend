@@ -1,12 +1,14 @@
-import { Module } from '@nestjs/common';
+import { Module, forwardRef } from '@nestjs/common';
 import { SequelizeModule } from '@nestjs/sequelize';
-import { CompanyService } from './company.service';
 import { CompanyController } from './company.controller';
+import { CompanyService } from './company.service';
 import { Company } from './entities/company.entity';
+import { UserModule } from '../user/user.module';
 
 @Module({
   imports: [
     SequelizeModule.forFeature([Company]),
+    forwardRef(() => UserModule),
   ],
   controllers: [CompanyController],
   providers: [CompanyService],

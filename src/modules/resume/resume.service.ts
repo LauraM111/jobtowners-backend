@@ -31,7 +31,7 @@ export class ResumeService {
   /**
    * Create a new resume with related education, experience, and attachments
    */
-  async create(userId: number, createResumeDto: CreateResumeDto): Promise<Resume> {
+  async create(userId: string, createResumeDto: CreateResumeDto): Promise<Resume> {
     const transaction = await this.sequelize.transaction();
     
     try {
@@ -119,7 +119,7 @@ export class ResumeService {
   /**
    * Find a user's resume
    */
-  async findOne(userId: number): Promise<Resume> {
+  async findOne(userId: string): Promise<Resume> {
     const resume = await this.resumeModel.findOne({
       where: { userId },
       include: [
@@ -163,9 +163,28 @@ export class ResumeService {
   }
 
   /**
+   * Find a resume by user ID
+   */
+  async findByUserId(userId: string): Promise<Resume> {
+    console.log(`Finding resume by user ID: ${userId}`);
+    
+    const resume = await this.resumeModel.findOne({
+      where: { userId },
+      include: [
+        { model: Education },
+        { model: Experience },
+        { model: Attachment }
+      ]
+    });
+
+    // Don't throw an error if not found, just return null
+    return resume;
+  }
+
+  /**
    * Update a user's resume
    */
-  async update(userId: number, updateResumeDto: UpdateResumeDto): Promise<Resume> {
+  async update(userId: string, updateResumeDto: UpdateResumeDto): Promise<Resume> {
     const transaction = await this.sequelize.transaction();
     
     try {
@@ -230,30 +249,6 @@ export class ResumeService {
         }
       }
 
-      // Handle attachment updates if provided
-      if (updateResumeDto.attachments) {
-        // Delete existing attachment records
-        await this.attachmentModel.destroy({
-          where: { resumeId: resume.id },
-          transaction,
-        });
-
-        // Create new attachment records
-        if (updateResumeDto.attachments.length > 0) {
-          await Promise.all(
-            updateResumeDto.attachments.map(att => 
-              this.attachmentModel.create(
-                {
-                  ...att,
-                  resumeId: resume.id,
-                },
-                { transaction }
-              )
-            )
-          );
-        }
-      }
-
       await transaction.commit();
 
       // Return the updated resume with all relations
@@ -267,7 +262,7 @@ export class ResumeService {
   /**
    * Remove a user's resume
    */
-  async remove(userId: number): Promise<void> {
+  async remove(userId: string): Promise<void> {
     const transaction = await this.sequelize.transaction();
     
     try {
@@ -309,7 +304,7 @@ export class ResumeService {
   /**
    * Get a user's personal details with all resume data
    */
-  async getPersonalDetails(userId: number): Promise<any | null> {
+  async getPersonalDetails(userId: string): Promise<any | null> {
     const resume = await this.resumeModel.findOne({
       where: { userId },
       include: [
@@ -358,12 +353,9 @@ export class ResumeService {
       addressDetails: resume.addressDetails,
       passionAndFutureGoals: resume.passionAndFutureGoals,
       
-      // Additional resume data
-      id: resume.id,
+      // Media
       videoUrl: resume.videoUrl,
       cvUrl: resume.cvUrl,
-      createdAt: resume.createdAt,
-      updatedAt: resume.updatedAt,
       
       // Related data
       education: resume.education,
@@ -375,7 +367,7 @@ export class ResumeService {
   /**
    * Update a user's personal details
    */
-  async updatePersonalDetails(userId: number, personalDetailsDto: PersonalDetailsDto): Promise<PersonalDetailsDto> {
+  async updatePersonalDetails(userId: string, personalDetailsDto: PersonalDetailsDto): Promise<Resume> {
     const transaction = await this.sequelize.transaction();
     
     try {
@@ -385,24 +377,22 @@ export class ResumeService {
         transaction,
       });
 
-      // If resume doesn't exist, create a new one with personal details
+      // If resume doesn't exist, create a new one
       if (!resume) {
         resume = await this.resumeModel.create(
           {
             ...personalDetailsDto,
             userId,
-          },
+          } as any,  // Type assertion to bypass type checking
           { transaction }
         );
       } else {
-        // Update existing resume with personal details
+        // Update existing resume
         await resume.update(personalDetailsDto, { transaction });
       }
 
       await transaction.commit();
-
-      // Return the updated personal details
-      return this.getPersonalDetails(userId);
+      return this.findOne(userId);
     } catch (error) {
       await transaction.rollback();
       throw error;
@@ -412,7 +402,7 @@ export class ResumeService {
   /**
    * Update a user's resume video
    */
-  async updateVideo(userId: number, videoUrl: string): Promise<Resume> {
+  async updateVideo(userId: string, videoUrl: string): Promise<Resume> {
     const transaction = await this.sequelize.transaction();
     
     try {
@@ -422,23 +412,21 @@ export class ResumeService {
         transaction,
       });
 
-      // If resume doesn't exist, create a new one with the video URL
+      // If resume doesn't exist, create a new one
       if (!resume) {
         resume = await this.resumeModel.create(
           {
             videoUrl,
             userId,
-          },
+          } as any,  // Type assertion to bypass type checking
           { transaction }
         );
       } else {
-        // Update existing resume with the video URL
+        // Update existing resume
         await resume.update({ videoUrl }, { transaction });
       }
 
       await transaction.commit();
-
-      // Return the updated resume
       return this.findOne(userId);
     } catch (error) {
       await transaction.rollback();
@@ -449,7 +437,7 @@ export class ResumeService {
   /**
    * Update a user's resume CV document
    */
-  async updateCv(userId: number, cvUrl: string): Promise<Resume> {
+  async updateCv(userId: string, cvUrl: string): Promise<Resume> {
     const transaction = await this.sequelize.transaction();
     
     try {
@@ -459,23 +447,21 @@ export class ResumeService {
         transaction,
       });
 
-      // If resume doesn't exist, create a new one with the CV URL
+      // If resume doesn't exist, create a new one
       if (!resume) {
         resume = await this.resumeModel.create(
           {
             cvUrl,
             userId,
-          },
+          } as any,  // Type assertion to bypass type checking
           { transaction }
         );
       } else {
-        // Update existing resume with the CV URL
+        // Update existing resume
         await resume.update({ cvUrl }, { transaction });
       }
 
       await transaction.commit();
-
-      // Return the updated resume
       return this.findOne(userId);
     } catch (error) {
       await transaction.rollback();
@@ -506,7 +492,7 @@ export class ResumeService {
       await transaction.commit();
 
       // Return the updated resume
-      return this.findOne(userId);
+      return this.findOne(userId.toString());
     } catch (error) {
       await transaction.rollback();
       throw error;
@@ -536,7 +522,7 @@ export class ResumeService {
       await transaction.commit();
 
       // Return the updated resume
-      return this.findOne(userId);
+      return this.findOne(userId.toString());
     } catch (error) {
       await transaction.rollback();
       throw error;
@@ -546,7 +532,7 @@ export class ResumeService {
   /**
    * Add an attachment to a user's resume
    */
-  async addAttachment(userId: number, createAttachmentDto: CreateAttachmentDto): Promise<Attachment> {
+  async addAttachment(userId: string, createAttachmentDto: CreateAttachmentDto): Promise<Attachment> {
     const transaction = await this.sequelize.transaction();
     
     try {
@@ -559,7 +545,7 @@ export class ResumeService {
       // If resume doesn't exist, create a new one
       if (!resume) {
         resume = await this.resumeModel.create(
-          { userId },
+          { userId } as any,  // Type assertion to bypass type checking
           { transaction }
         );
       }
@@ -584,7 +570,7 @@ export class ResumeService {
   /**
    * Get all attachments for a user's resume
    */
-  async getAttachments(userId: number): Promise<Attachment[]> {
+  async getAttachments(userId: string): Promise<Attachment[]> {
     // Find the resume
     const resume = await this.resumeModel.findOne({
       where: { userId },
@@ -601,7 +587,7 @@ export class ResumeService {
   /**
    * Delete an attachment from a user's resume
    */
-  async deleteAttachment(userId: number, attachmentId: string): Promise<void> {
+  async deleteAttachment(userId: string, attachmentId: string): Promise<void> {
     const transaction = await this.sequelize.transaction();
     
     try {
@@ -641,7 +627,7 @@ export class ResumeService {
   /**
    * Add education to a user's resume
    */
-  async addEducation(userId: number, createEducationDto: CreateEducationDto): Promise<Education> {
+  async addEducation(userId: string, createEducationDto: CreateEducationDto): Promise<Education> {
     const transaction = await this.sequelize.transaction();
     
     try {
@@ -654,15 +640,26 @@ export class ResumeService {
       // If resume doesn't exist, create a new one
       if (!resume) {
         resume = await this.resumeModel.create(
-          { userId },
+          { userId } as any,  // Use type assertion to bypass type checking
           { transaction }
         );
+      }
+
+      // Convert string dates to Date objects
+      const educationData: any = { ...createEducationDto };
+      
+      if (educationData.startDate) {
+        educationData.startDate = new Date(educationData.startDate);
+      }
+      
+      if (educationData.endDate) {
+        educationData.endDate = new Date(educationData.endDate);
       }
 
       // Create the education entry
       const education = await this.educationModel.create(
         {
-          ...createEducationDto,
+          ...educationData,
           resumeId: resume.id,
         },
         { transaction }
@@ -679,7 +676,7 @@ export class ResumeService {
   /**
    * Get all education entries for a user's resume
    */
-  async getEducation(userId: number): Promise<Education[]> {
+  async getEducation(userId: string): Promise<Education[]> {
     // Find the resume
     const resume = await this.resumeModel.findOne({
       where: { userId },
@@ -696,7 +693,7 @@ export class ResumeService {
   /**
    * Update an education entry
    */
-  async updateEducation(userId: number, educationId: string, updateEducationDto: CreateEducationDto): Promise<Education> {
+  async updateEducation(userId: string, educationId: string, updateEducationDto: CreateEducationDto): Promise<Education> {
     const transaction = await this.sequelize.transaction();
     
     try {
@@ -723,8 +720,19 @@ export class ResumeService {
         throw new NotFoundException('Education entry not found or does not belong to this resume');
       }
 
+      // Convert string dates to Date objects
+      const updateData: any = { ...updateEducationDto };
+      
+      if (updateData.startDate) {
+        updateData.startDate = new Date(updateData.startDate);
+      }
+      
+      if (updateData.endDate) {
+        updateData.endDate = new Date(updateData.endDate);
+      }
+
       // Update the education entry
-      await education.update(updateEducationDto, { transaction });
+      await education.update(updateData, { transaction });
 
       await transaction.commit();
       
@@ -739,7 +747,7 @@ export class ResumeService {
   /**
    * Delete an education entry
    */
-  async deleteEducation(userId: number, educationId: string): Promise<void> {
+  async deleteEducation(userId: string, educationId: string): Promise<void> {
     const transaction = await this.sequelize.transaction();
     
     try {
@@ -779,7 +787,7 @@ export class ResumeService {
   /**
    * Add work experience to a user's resume
    */
-  async addExperience(userId: number, createExperienceDto: CreateExperienceDto): Promise<Experience> {
+  async addExperience(userId: string, createExperienceDto: CreateExperienceDto): Promise<Experience> {
     const transaction = await this.sequelize.transaction();
     
     try {
@@ -792,15 +800,31 @@ export class ResumeService {
       // If resume doesn't exist, create a new one
       if (!resume) {
         resume = await this.resumeModel.create(
-          { userId },
+          { userId } as any,  // Use type assertion to bypass type checking
           { transaction }
         );
+      }
+
+      // Map fromYear and toYear to startDate and endDate if they exist in the DTO
+      const experienceData: any = {
+        ...createExperienceDto,
+        startDate: createExperienceDto.startDate || createExperienceDto['fromYear'],
+        endDate: createExperienceDto.endDate || createExperienceDto['toYear'],
+      };
+
+      // Convert string dates to Date objects
+      if (experienceData.startDate) {
+        experienceData.startDate = new Date(experienceData.startDate);
+      }
+      
+      if (experienceData.endDate) {
+        experienceData.endDate = new Date(experienceData.endDate);
       }
 
       // Create the experience entry
       const experience = await this.experienceModel.create(
         {
-          ...createExperienceDto,
+          ...experienceData,
           resumeId: resume.id,
         },
         { transaction }
@@ -817,7 +841,7 @@ export class ResumeService {
   /**
    * Get all work experience entries for a user's resume
    */
-  async getExperience(userId: number): Promise<Experience[]> {
+  async getExperience(userId: string): Promise<Experience[]> {
     // Find the resume
     const resume = await this.resumeModel.findOne({
       where: { userId },
@@ -834,7 +858,7 @@ export class ResumeService {
   /**
    * Update a work experience entry
    */
-  async updateExperience(userId: number, experienceId: string, updateExperienceDto: CreateExperienceDto): Promise<Experience> {
+  async updateExperience(userId: string, experienceId: string, updateExperienceDto: CreateExperienceDto): Promise<Experience> {
     const transaction = await this.sequelize.transaction();
     
     try {
@@ -861,8 +885,19 @@ export class ResumeService {
         throw new NotFoundException('Experience entry not found or does not belong to this resume');
       }
 
+      // Convert string dates to Date objects if needed
+      const updateData: any = { ...updateExperienceDto };
+      
+      if (updateExperienceDto.startDate) {
+        updateData.startDate = new Date(updateExperienceDto.startDate);
+      }
+      
+      if (updateExperienceDto.endDate) {
+        updateData.endDate = new Date(updateExperienceDto.endDate);
+      }
+
       // Update the experience entry
-      await experience.update(updateExperienceDto, { transaction });
+      await experience.update(updateData, { transaction });
 
       await transaction.commit();
       

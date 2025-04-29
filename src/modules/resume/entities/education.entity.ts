@@ -1,17 +1,18 @@
-import { Column, Model, Table, DataType, ForeignKey, BelongsTo } from 'sequelize-typescript';
+import { Column, Model, Table, DataType, ForeignKey, BelongsTo, BeforeCreate } from 'sequelize-typescript';
+import { v4 as uuidv4 } from 'uuid';
 import { Resume } from './resume.entity';
 
 @Table({
   tableName: 'education',
   timestamps: true
 })
-export class Education extends Model {
+export class Education extends Model<Education> {
   @Column({
-    type: DataType.INTEGER,
-    autoIncrement: true,
+    type: DataType.UUID,
     primaryKey: true,
+    defaultValue: DataType.UUIDV4
   })
-  id: number;
+  id: string;
 
   @Column({
     type: DataType.STRING,
@@ -32,13 +33,13 @@ export class Education extends Model {
   fieldOfStudy: string;
 
   @Column({
-    type: DataType.DATE,
+    type: DataType.DATEONLY,
     allowNull: true
   })
   startDate: Date;
 
   @Column({
-    type: DataType.DATE,
+    type: DataType.DATEONLY,
     allowNull: true
   })
   endDate: Date;
@@ -51,11 +52,18 @@ export class Education extends Model {
 
   @ForeignKey(() => Resume)
   @Column({
-    type: DataType.INTEGER,
+    type: DataType.UUID,
     allowNull: false
   })
-  resumeId: number;
+  resumeId: string;
 
   @BelongsTo(() => Resume)
   resume: Resume;
+
+  @BeforeCreate
+  static generateId(instance: Education) {
+    if (!instance.id) {
+      instance.id = uuidv4();
+    }
+  }
 } 

@@ -62,38 +62,37 @@ export class UserController {
   @ApiOperation({ summary: 'Get current user profile' })
   @ApiResponse({ status: 200, description: 'User profile retrieved successfully' })
   async getProfile(@Request() req): Promise<any> {
-    const user = await this.userService.findById(req.user.userId);
+    const userId = req.user.sub || req.user.userId;
+    const user = await this.userService.findById(userId);
     
-    // Remove sensitive information
-    const userProfile = {
-      id: user.id,
-      firstName: user.firstName,
-      lastName: user.lastName,
-      email: user.email,
-      userType: user.userType,
-      verified: user.isEmailVerified,
-    };
+    // Format response based on user type
+    const profileData = await this.userService.formatUserProfile(user);
     
-    return successResponse(userProfile, 'User profile retrieved successfully');
+    return successResponse(profileData, 'User profile retrieved successfully');
   }
 
-  @Patch('me')
+  @Patch('profile')
   @UseGuards(JwtAuthGuard)
   @ApiOperation({ summary: 'Update current user profile' })
   @ApiResponse({ status: 200, description: 'User profile updated successfully' })
   @ApiBearerAuth()
-  async updateProfile(@Req() req, @Body() updateUserDto: UpdateUserDto) {
+  async updateProfile(@Req() req, @Body() updateProfileDto: UpdateProfileDto) {
     try {
+      const userId = req.user.sub || req.user.userId;
+      const userType = req.user.userType;
+      
       // Check if email is being attempted to be updated
-      if ('email' in updateUserDto) {
-        throw new BadRequestException('Email cannot be updated');
+      if ('email' in updateProfileDto) {
+        throw new BadRequestException('Email cannot be updated through this endpoint');
       }
       
-      const updatedUser = await this.userService.updateUserProfile(req.user.sub, updateUserDto);
+      const updatedUser = await this.userService.updateUserProfile(userId, userType, updateProfileDto);
       return successResponse(updatedUser, 'User profile updated successfully');
     } catch (error) {
-      console.error('Error updating user profile:', error);
-      throw error;
+      if (error instanceof BadRequestException) {
+        throw error;
+      }
+      throw new BadRequestException('Failed to update profile: ' + error.message);
     }
   }
 

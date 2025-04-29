@@ -25,11 +25,17 @@ export class UpdateProfileDto {
 
   @ApiProperty({ example: '+1234567890', description: 'Phone number', required: false })
   @IsOptional()
-  
+  @IsPhoneNumber()
   phoneNumber?: string;
 
   @ApiProperty({ example: 'john.doe@example.com', description: 'Email address', required: false })
   @IsOptional()
   @IsEmail({}, { message: 'Invalid email format' })
   email?: string;
+
+  @ApiProperty({ example: 'Acme Inc.', description: 'Company name (for employers)', required: false })
+  @IsOptional()
+  @IsString()
+  @Length(2, 100)
+  companyName?: string;
 } 

@@ -184,6 +184,7 @@ export class ResumeController {
   @ApiResponse({ status: 201, description: 'Education added successfully' })
   @ApiBearerAuth()
   async addEducation(@Request() req, @Body() createEducationDto: CreateEducationDto) {
+    console.log(createEducationDto);
     const education = await this.resumeService.addEducation(req.user.sub, createEducationDto);
     return successResponse(education, 'Education added successfully');
   }

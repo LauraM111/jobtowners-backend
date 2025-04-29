@@ -77,7 +77,7 @@ export class DatabaseInitService implements OnModuleInit {
       // Create resumes table
       await this.sequelize.query(`
         CREATE TABLE IF NOT EXISTS resumes (
-          id INT AUTO_INCREMENT PRIMARY KEY,
+          id VARCHAR(36) PRIMARY KEY,
           firstName VARCHAR(255) NOT NULL,
           lastName VARCHAR(255) NOT NULL,
           email VARCHAR(255) NOT NULL,
@@ -110,47 +110,48 @@ export class DatabaseInitService implements OnModuleInit {
       // Create education table
       await this.sequelize.query(`
         CREATE TABLE IF NOT EXISTS education (
-          id INT AUTO_INCREMENT PRIMARY KEY,
+          id VARCHAR(36) PRIMARY KEY,
           institution VARCHAR(255) NOT NULL,
           degree VARCHAR(255) NOT NULL,
           fieldOfStudy VARCHAR(255),
           startDate DATE,
           endDate DATE,
           description TEXT,
-          resumeId INT NOT NULL,
+          resumeId VARCHAR(36) NOT NULL,
           createdAt DATETIME NOT NULL,
           updatedAt DATETIME NOT NULL,
-          FOREIGN KEY (resumeId) REFERENCES resumes(id) ON DELETE CASCADE
-        ) ENGINE=InnoDB;
+          CONSTRAINT fk_education_resume FOREIGN KEY (resumeId) REFERENCES resumes(id) ON DELETE CASCADE
+        ) ENGINE=InnoDB CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
       `);
       
       // Create experiences table
       await this.sequelize.query(`
         CREATE TABLE IF NOT EXISTS experiences (
-          id INT AUTO_INCREMENT PRIMARY KEY,
+          id VARCHAR(36) PRIMARY KEY,
           position VARCHAR(255) NOT NULL,
           companyName VARCHAR(255) NOT NULL,
           startDate DATE,
           endDate DATE,
           description TEXT,
-          resumeId INT NOT NULL,
+          resumeId VARCHAR(36) NOT NULL,
           createdAt DATETIME NOT NULL,
           updatedAt DATETIME NOT NULL,
-          FOREIGN KEY (resumeId) REFERENCES resumes(id) ON DELETE CASCADE
-        ) ENGINE=InnoDB;
+          CONSTRAINT fk_experiences_resume FOREIGN KEY (resumeId) REFERENCES resumes(id) ON DELETE CASCADE
+        ) ENGINE=InnoDB CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
       `);
       
       // Create attachments table
       await this.sequelize.query(`
         CREATE TABLE IF NOT EXISTS attachments (
-          id INT AUTO_INCREMENT PRIMARY KEY,
+          id VARCHAR(36) PRIMARY KEY,
           fileName VARCHAR(255) NOT NULL,
           fileUrl VARCHAR(255) NOT NULL,
-          resumeId INT NOT NULL,
+          description TEXT,
+          resumeId VARCHAR(36) NOT NULL,
           createdAt DATETIME NOT NULL,
           updatedAt DATETIME NOT NULL,
-          FOREIGN KEY (resumeId) REFERENCES resumes(id) ON DELETE CASCADE
-        ) ENGINE=InnoDB;
+          CONSTRAINT fk_attachments_resume FOREIGN KEY (resumeId) REFERENCES resumes(id) ON DELETE CASCADE
+        ) ENGINE=InnoDB CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
       `);
       
       // Create companies table

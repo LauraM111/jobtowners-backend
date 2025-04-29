@@ -70,7 +70,7 @@ async function bootstrap() {
     console.log('Creating resumes table...');
     await sequelize.query(`
       CREATE TABLE IF NOT EXISTS resumes (
-        id INT AUTO_INCREMENT PRIMARY KEY,
+        id VARCHAR(36) PRIMARY KEY,
         firstName VARCHAR(255) NOT NULL,
         lastName VARCHAR(255) NOT NULL,
         email VARCHAR(255) NOT NULL,
@@ -103,14 +103,14 @@ async function bootstrap() {
     console.log('Creating education table...');
     await sequelize.query(`
       CREATE TABLE IF NOT EXISTS education (
-        id INT AUTO_INCREMENT PRIMARY KEY,
+        id VARCHAR(36) PRIMARY KEY,
         institution VARCHAR(255) NOT NULL,
         degree VARCHAR(255) NOT NULL,
         fieldOfStudy VARCHAR(255),
         startDate DATE,
         endDate DATE,
         description TEXT,
-        resumeId INT NOT NULL,
+        resumeId VARCHAR(36) NOT NULL,
         createdAt DATETIME NOT NULL,
         updatedAt DATETIME NOT NULL,
         CONSTRAINT fk_education_resume FOREIGN KEY (resumeId) REFERENCES resumes(id) ON DELETE CASCADE
@@ -120,13 +120,13 @@ async function bootstrap() {
     console.log('Creating experiences table...');
     await sequelize.query(`
       CREATE TABLE IF NOT EXISTS experiences (
-        id INT AUTO_INCREMENT PRIMARY KEY,
+        id VARCHAR(36) PRIMARY KEY,
         position VARCHAR(255) NOT NULL,
         companyName VARCHAR(255) NOT NULL,
         startDate DATE,
         endDate DATE,
         description TEXT,
-        resumeId INT NOT NULL,
+        resumeId VARCHAR(36) NOT NULL,
         createdAt DATETIME NOT NULL,
         updatedAt DATETIME NOT NULL,
         CONSTRAINT fk_experiences_resume FOREIGN KEY (resumeId) REFERENCES resumes(id) ON DELETE CASCADE
@@ -136,10 +136,11 @@ async function bootstrap() {
     console.log('Creating attachments table...');
     await sequelize.query(`
       CREATE TABLE IF NOT EXISTS attachments (
-        id INT AUTO_INCREMENT PRIMARY KEY,
+        id VARCHAR(36) PRIMARY KEY,
         fileName VARCHAR(255) NOT NULL,
         fileUrl VARCHAR(255) NOT NULL,
-        resumeId INT NOT NULL,
+        description TEXT,
+        resumeId VARCHAR(36) NOT NULL,
         createdAt DATETIME NOT NULL,
         updatedAt DATETIME NOT NULL,
         CONSTRAINT fk_attachments_resume FOREIGN KEY (resumeId) REFERENCES resumes(id) ON DELETE CASCADE

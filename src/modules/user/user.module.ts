@@ -6,6 +6,8 @@ import { User } from './entities/user.entity';
 import { MailModule } from '../mail/mail.module';
 import { AuthModule } from '../auth/auth.module';
 import { UploadModule } from '../upload/upload.module';
+import { ResumeModule } from '../resume/resume.module';
+import { CompanyModule } from '../company/company.module';
 
 @Module({
   imports: [
@@ -13,6 +15,8 @@ import { UploadModule } from '../upload/upload.module';
     MailModule,
     forwardRef(() => AuthModule),
     UploadModule,
+    forwardRef(() => ResumeModule),
+    forwardRef(() => CompanyModule),
   ],
   controllers: [UserController],
   providers: [UserService],

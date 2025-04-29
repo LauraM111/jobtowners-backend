@@ -14,6 +14,9 @@ import { TokenService } from '../auth/token.service';
 import { UploadService } from '../upload/upload.service';
 import { AuthService } from '../auth/auth.service';
 import { AdminUpdateUserDto } from './dto/admin-update-user.dto';
+import { ResumeService } from '../resume/resume.service';
+import { CompanyService } from '../company/company.service';
+import { UpdateProfileDto } from './dto/update-profile.dto';
 
 @Injectable()
 export class UserService {
@@ -28,6 +31,8 @@ export class UserService {
     private uploadService: UploadService,
     @Inject(forwardRef(() => AuthService))
     private authService: AuthService,
+    private resumeService: ResumeService,
+    private companyService: CompanyService,
   ) {}
 
   /**
@@ -344,24 +349,74 @@ export class UserService {
   }
 
   /**
-   * Update user profile
+   * Format user profile based on user type
    */
-  async updateUserProfile(userId: string, updateUserDto: UpdateUserDto): Promise<User> {
-    const user = await this.userModel.findByPk(userId);
+  async formatUserProfile(user: User): Promise<any> {
+    // Base profile data for all user types
+    const profileData = {
+      id: user.id,
+      firstName: user.firstName,
+      lastName: user.lastName,
+      email: user.email,
+      phoneNumber: user.phoneNumber,
+      userType: user.userType,
+      isEmailVerified: user.isEmailVerified,
+      isActive: user.isActive,
+      createdAt: user.createdAt,
+      updatedAt: user.updatedAt
+    };
+    
+    // Add user type specific data
+    if (user.userType === UserType.CANDIDATE) {
+      // For candidates, include education info if available
+      const resume = await this.resumeService.findByUserId(user.id);
+      if (resume) {
+        profileData['education'] = resume.education;
+        profileData['experiences'] = resume.experiences;
+        profileData['skills'] = resume.professionalSkills;
+      }
+    } else if (user.userType === UserType.EMPLOYER) {
+      // For employers, include company info if available
+      profileData['companyName'] = user.companyName;
+      
+      // Get companies owned by this user
+      const companies = await this.companyService.findByUserId(user.id);
+      if (companies && companies.length > 0) {
+        profileData['companies'] = companies.map(company => ({
+          id: company.id,
+          name: company.companyName,
+          logo: company.logoUrl
+        }));
+      }
+    }
+    
+    return profileData;
+  }
+
+  /**
+   * Update user profile with type-specific validation
+   */
+  async updateUserProfile(userId: string, userType: UserType, updateProfileDto: UpdateProfileDto): Promise<any> {
+    const user = await this.findById(userId);
     
     if (!user) {
       throw new NotFoundException('User not found');
     }
     
+    // Validate fields based on user type
+    if (userType === UserType.CANDIDATE) {
+      // Candidate-specific validation
+      // For example, candidates might have different field requirements
+    } else if (userType === UserType.EMPLOYER) {
+      // Employer-specific validation
+      // For example, employers might be able to update company name
+    }
+    
     // Update user with provided fields
-    await user.update(updateUserDto);
+    await user.update(updateProfileDto);
     
-    // Return updated user without password
-    const updatedUser = await this.userModel.findByPk(userId, {
-      attributes: { exclude: ['password'] }
-    });
-    
-    return updatedUser;
+    // Return formatted profile
+    return this.formatUserProfile(user);
   }
 
   /**
