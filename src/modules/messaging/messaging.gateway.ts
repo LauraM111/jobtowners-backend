@@ -96,7 +96,7 @@ export class MessagingGateway implements OnGatewayConnection, OnGatewayDisconnec
   @SubscribeMessage('send_message')
   async handleMessage(
     @ConnectedSocket() client: Socket,
-    @MessageBody() data: CreateMessageDto
+    @MessageBody() data: CreateMessageDto & { attachments?: Array<{fileName: string, fileType: string, fileSize: number, fileUrl: string}> }
   ) {
     try {
       const userId = client.data.userId;
@@ -110,8 +110,11 @@ export class MessagingGateway implements OnGatewayConnection, OnGatewayDisconnec
         return { error: 'Conversation ID is required' };
       }
       
+      // Extract attachments if any
+      const { attachments, ...messageData } = data;
+      
       // Create the message
-      const message = await this.messagingService.createMessage(userId, data);
+      const message = await this.messagingService.createMessage(userId, messageData, attachments);
       
       // Get the conversation to find the other user
       const conversation = await this.messagingService.getConversation(data.conversationId, userId);

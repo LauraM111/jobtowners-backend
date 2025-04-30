@@ -14,6 +14,7 @@ import {
 import { FilesInterceptor } from '@nestjs/platform-express';
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth, ApiConsumes, ApiBody } from '@nestjs/swagger';
 import { MessagingService } from './messaging.service';
+import { UploadService } from '../upload/upload.service';
 import { CreateConversationDto } from './dto/create-conversation.dto';
 import { CreateMessageDto } from './dto/create-message.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
@@ -21,16 +22,16 @@ import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { UserType } from '../user/entities/user.entity';
 import { successResponse } from '../../common/helpers/response.helper';
-import { diskStorage } from 'multer';
-import { extname } from 'path';
-import { v4 as uuidv4 } from 'uuid';
 
 @ApiTags('Messaging')
 @Controller('messaging')
 @UseGuards(JwtAuthGuard)
 @ApiBearerAuth()
 export class MessagingController {
-  constructor(private readonly messagingService: MessagingService) {}
+  constructor(
+    private readonly messagingService: MessagingService,
+    private readonly uploadService: UploadService
+  ) {}
 
   @Post('conversations')
   @UseGuards(RolesGuard)
@@ -123,43 +124,38 @@ export class MessagingController {
   @ApiOperation({ summary: 'Create a new message' })
   @ApiResponse({ status: 201, description: 'Message sent successfully' })
   @ApiConsumes('multipart/form-data')
-  @UseInterceptors(FilesInterceptor('attachments', 5, {
-    storage: diskStorage({
-      destination: './uploads/messages',
-      filename: (req, file, cb) => {
-        const randomName = uuidv4();
-        return cb(null, `${randomName}${extname(file.originalname)}`);
-      },
-    }),
-    fileFilter: (req, file, cb) => {
-      // Allow common file types
-      const allowedMimeTypes = [
-        'image/jpeg', 'image/png', 'image/gif',
-        'application/pdf', 'application/msword',
-        'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-        'text/plain'
-      ];
-      
-      if (!allowedMimeTypes.includes(file.mimetype)) {
-        return cb(new BadRequestException('File type not allowed'), false);
-      }
-      cb(null, true);
-    },
-    limits: {
-      fileSize: 5 * 1024 * 1024, // 5MB
-    },
-  }))
+  @UseInterceptors(FilesInterceptor('attachments', 5))
   async createMessage(
     @Request() req,
     @Body() createMessageDto: CreateMessageDto,
     @UploadedFiles() files?: Express.Multer.File[]
   ) {
     try {
+      // Upload files to DigitalOcean Spaces if any
+      const uploadedFiles = [];
+      if (files && files.length > 0) {
+        for (const file of files) {
+          const fileUrl = await this.uploadService.uploadFile(
+            file.buffer,
+            'message-attachments',
+            file.originalname
+          );
+          
+          uploadedFiles.push({
+            fileName: file.originalname,
+            fileType: file.mimetype,
+            fileSize: file.size,
+            fileUrl
+          });
+        }
+      }
+
       const message = await this.messagingService.createMessage(
         req.user.sub,
         createMessageDto,
-        files
+        uploadedFiles
       );
+      
       return successResponse(message, 'Message sent successfully');
     } catch (error) {
       throw new BadRequestException(error.message);

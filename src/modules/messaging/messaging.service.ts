@@ -223,7 +223,11 @@ export class MessagingService {
   /**
    * Create a new message
    */
-  async createMessage(userId: string, createMessageDto: CreateMessageDto, files?: Express.Multer.File[]): Promise<Message> {
+  async createMessage(
+    userId: string, 
+    createMessageDto: CreateMessageDto, 
+    attachments?: Array<{fileName: string, fileType: string, fileSize: number, fileUrl: string}>
+  ): Promise<Message> {
     const transaction = await this.sequelize.transaction();
     
     try {
@@ -252,20 +256,20 @@ export class MessagingService {
       }, { transaction });
       
       // Handle file attachments if any
-      if (files && files.length > 0) {
-        const attachments = await Promise.all(
-          files.map(file => 
+      if (attachments && attachments.length > 0) {
+        const messageAttachments = await Promise.all(
+          attachments.map(attachment => 
             this.messageAttachmentModel.create({
               messageId: message.id,
-              fileName: file.originalname,
-              fileType: file.mimetype,
-              fileSize: file.size,
-              fileUrl: file.path // This should be the URL where the file is stored
+              fileName: attachment.fileName,
+              fileType: attachment.fileType,
+              fileSize: attachment.fileSize,
+              fileUrl: attachment.fileUrl
             }, { transaction })
           )
         );
         
-        message.setDataValue('attachments', attachments);
+        message.setDataValue('attachments', messageAttachments);
       }
       
       await transaction.commit();

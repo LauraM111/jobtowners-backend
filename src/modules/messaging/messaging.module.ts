@@ -11,17 +11,7 @@ import { MessageAttachment } from './entities/message-attachment.entity';
 import { User } from '../user/entities/user.entity';
 import { JobApplication } from '../job-application/entities/job-application.entity';
 import { Job } from '../job/entities/job.entity';
-import { MulterModule } from '@nestjs/platform-express';
-import { diskStorage } from 'multer';
-import { extname } from 'path';
-import { v4 as uuidv4 } from 'uuid';
-import { existsSync, mkdirSync } from 'fs';
-
-// Create uploads directory if it doesn't exist
-const uploadsDir = './uploads/messages';
-if (!existsSync(uploadsDir)) {
-  mkdirSync(uploadsDir, { recursive: true });
-}
+import { UploadModule } from '../upload/upload.module';
 
 @Module({
   imports: [
@@ -43,15 +33,7 @@ if (!existsSync(uploadsDir)) {
         },
       }),
     }),
-    MulterModule.register({
-      storage: diskStorage({
-        destination: uploadsDir,
-        filename: (req, file, cb) => {
-          const randomName = uuidv4();
-          return cb(null, `${randomName}${extname(file.originalname)}`);
-        },
-      }),
-    }),
+    UploadModule,
   ],
   controllers: [MessagingController],
   providers: [MessagingService, MessagingGateway],
