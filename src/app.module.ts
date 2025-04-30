@@ -22,6 +22,7 @@ import { UserSeeder } from './database/seeders/user.seeder';
 import { DatabaseInitService } from './database/database-init.service';
 import { JobApplicationModule } from './modules/job-application/job-application.module';
 import { CandidatePaymentModule } from './modules/candidate-payment/candidate-payment.module';
+import { MessagingModule } from './modules/messaging/messaging.module';
 
 // Import entities from their correct locations
 import { User } from './modules/user/entities/user.entity';
@@ -96,6 +97,7 @@ import { ApplicationLimit } from './modules/candidate-payment/entities/applicati
     JobModule,
     JobApplicationModule,
     CandidatePaymentModule,
+    MessagingModule,
   ],
   controllers: [AppController],
   providers: [

@@ -19,6 +19,22 @@ export class JobApplicationController {
     private readonly candidatePaymentService: CandidatePaymentService,
   ) {}
 
+  @Get('employer-applicants')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('employer')
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Get list of candidates who applied to employer jobs' })
+  @ApiResponse({ status: 200, description: 'Candidates retrieved successfully' })
+  async getJobApplicants(@Request() req) {
+    try {
+      const employerId = req.user.sub;
+      const applicants = await this.jobApplicationService.findApplicantsByEmployer(employerId);
+      return successResponse(applicants, 'Candidates retrieved successfully');
+    } catch (error) {
+      throw new BadRequestException(error.message);
+    }
+  }
+
   @Post()
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()

@@ -157,6 +157,12 @@ export class Resume extends Model<Resume> {
   })
   cvUrl: string;
 
+  @Column({
+    type: DataType.STRING,
+    allowNull: true
+  })
+  title: string;
+
   // Relations
   @ForeignKey(() => User)
   @Column({

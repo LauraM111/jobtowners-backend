@@ -362,6 +362,53 @@ export class DatabaseInitService implements OnModuleInit {
         ) ENGINE=InnoDB CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
       `);
       
+      // Create conversations table
+      await this.sequelize.query(`
+        CREATE TABLE IF NOT EXISTS conversations (
+          id VARCHAR(36) PRIMARY KEY,
+          employerId VARCHAR(36) NOT NULL,
+          candidateId VARCHAR(36) NOT NULL,
+          jobApplicationId VARCHAR(36) NOT NULL,
+          lastMessageAt DATETIME,
+          createdAt DATETIME NOT NULL,
+          updatedAt DATETIME NOT NULL,
+          CONSTRAINT fk_conversations_employer FOREIGN KEY (employerId) REFERENCES users(id) ON DELETE CASCADE,
+          CONSTRAINT fk_conversations_candidate FOREIGN KEY (candidateId) REFERENCES users(id) ON DELETE CASCADE,
+          CONSTRAINT fk_conversations_job_application FOREIGN KEY (jobApplicationId) REFERENCES job_applications(id) ON DELETE CASCADE,
+          UNIQUE KEY unique_employer_candidate_job (employerId, candidateId, jobApplicationId)
+        ) ENGINE=InnoDB CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+      `);
+      
+      // Create messages table
+      await this.sequelize.query(`
+        CREATE TABLE IF NOT EXISTS messages (
+          id VARCHAR(36) PRIMARY KEY,
+          conversationId VARCHAR(36) NOT NULL,
+          senderId VARCHAR(36) NOT NULL,
+          content TEXT NOT NULL,
+          isRead BOOLEAN DEFAULT false,
+          createdAt DATETIME NOT NULL,
+          updatedAt DATETIME NOT NULL,
+          CONSTRAINT fk_messages_conversation FOREIGN KEY (conversationId) REFERENCES conversations(id) ON DELETE CASCADE,
+          CONSTRAINT fk_messages_sender FOREIGN KEY (senderId) REFERENCES users(id) ON DELETE CASCADE
+        ) ENGINE=InnoDB CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+      `);
+      
+      // Create message attachments table
+      await this.sequelize.query(`
+        CREATE TABLE IF NOT EXISTS message_attachments (
+          id VARCHAR(36) PRIMARY KEY,
+          messageId VARCHAR(36) NOT NULL,
+          fileName VARCHAR(255) NOT NULL,
+          fileType VARCHAR(100) NOT NULL,
+          fileSize INT NOT NULL,
+          fileUrl VARCHAR(255) NOT NULL,
+          createdAt DATETIME NOT NULL,
+          updatedAt DATETIME NOT NULL,
+          CONSTRAINT fk_message_attachments_message FOREIGN KEY (messageId) REFERENCES messages(id) ON DELETE CASCADE
+        ) ENGINE=InnoDB CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+      `);
+      
       // Re-enable foreign key checks
       await this.sequelize.query('SET FOREIGN_KEY_CHECKS = 1');
       
