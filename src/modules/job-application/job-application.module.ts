@@ -10,6 +10,7 @@ import { SubscriptionModule } from '../subscription/subscription.module';
 import { User } from '../user/entities/user.entity';
 import { Resume } from '../resume/entities/resume.entity';
 import { Job } from '../job/entities/job.entity';
+import { CandidatePaymentModule } from '../candidate-payment/candidate-payment.module';
 
 @Module({
   imports: [
@@ -18,6 +19,7 @@ import { Job } from '../job/entities/job.entity';
     ResumeModule,
     UserModule,
     SubscriptionModule,
+    CandidatePaymentModule,
   ],
   controllers: [JobApplicationController],
   providers: [JobApplicationService],

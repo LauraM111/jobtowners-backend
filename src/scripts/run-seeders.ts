@@ -1,6 +1,7 @@
 import { NestFactory } from '@nestjs/core';
 import { AppModule } from '../app.module';
 import { UserSeeder } from '../database/seeders/user.seeder';
+import './seeders/candidate-plan.seeder';
 
 async function bootstrap() {
   const app = await NestFactory.createApplicationContext(AppModule);
@@ -13,6 +14,9 @@ async function bootstrap() {
     
     // Run the seeder
     await userSeeder.seed();
+    
+    console.log('Running candidate plan seeder...');
+    await import('./seeders/candidate-plan.seeder');
     
     console.log('Seeders completed successfully');
   } catch (error) {

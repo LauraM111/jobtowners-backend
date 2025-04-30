@@ -21,6 +21,7 @@ import { Sequelize } from 'sequelize-typescript';
 import { UserSeeder } from './database/seeders/user.seeder';
 import { DatabaseInitService } from './database/database-init.service';
 import { JobApplicationModule } from './modules/job-application/job-application.module';
+import { CandidatePaymentModule } from './modules/candidate-payment/candidate-payment.module';
 
 // Import entities from their correct locations
 import { User } from './modules/user/entities/user.entity';
@@ -34,6 +35,9 @@ import { SubscriptionPlan } from './modules/subscription/entities/subscription-p
 import { Subscription } from './modules/subscription/entities/subscription.entity';
 import { Job } from './modules/job/entities/job.entity';
 import { JobApplication } from './modules/job-application/entities/job-application.entity';
+import { CandidatePlan } from './modules/candidate-payment/entities/candidate-plan.entity';
+import { CandidateOrder } from './modules/candidate-payment/entities/candidate-order.entity';
+import { ApplicationLimit } from './modules/candidate-payment/entities/application-limit.entity';
 
 @Module({
   imports: [
@@ -64,7 +68,10 @@ import { JobApplication } from './modules/job-application/entities/job-applicati
           SubscriptionPlan,
           Subscription,
           Job,
-          JobApplication
+          JobApplication,
+          CandidatePlan,
+          CandidateOrder,
+          ApplicationLimit
         ],
         autoLoadModels: true,
         synchronize: false, // Disable auto-sync to prevent errors
@@ -88,6 +95,7 @@ import { JobApplication } from './modules/job-application/entities/job-applicati
     SubscriptionModule,
     JobModule,
     JobApplicationModule,
+    CandidatePaymentModule,
   ],
   controllers: [AppController],
   providers: [

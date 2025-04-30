@@ -10,23 +10,42 @@ import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { JobApplication } from './entities/job-application.entity';
 import { ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
 import { successResponse } from '../../utils/response-utils';
+import { CandidatePaymentService } from '../candidate-payment/candidate-payment.service';
 
 @Controller('job-applications')
 export class JobApplicationController {
-  constructor(private readonly jobApplicationService: JobApplicationService) {}
+  constructor(
+    private readonly jobApplicationService: JobApplicationService,
+    private readonly candidatePaymentService: CandidatePaymentService,
+  ) {}
 
   @Post()
-  @ApiOperation({ summary: 'Create a new job application' })
-  @ApiResponse({ status: 201, description: 'Job application created successfully' })
+  @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
+  @ApiOperation({ summary: 'Apply for a job' })
+  @ApiResponse({ status: 201, description: 'Application submitted successfully' })
   async create(@Request() req, @Body() createJobApplicationDto: CreateJobApplicationDto) {
-    const userId = req.user.sub;
-    if (!userId) {
-      throw new BadRequestException('User ID is required');
+    try {
+      // Check if user has paid and has available application slots
+      const { canApply, remainingApplications } = await this.candidatePaymentService.checkApplicationLimit(req.user.sub);
+      
+      if (!canApply) {
+        throw new BadRequestException('You need to make a payment or have reached your daily application limit');
+      }
+      
+      // Create the application
+      const application = await this.jobApplicationService.create(req.user.sub, createJobApplicationDto);
+      
+      // Increment application count
+      await this.candidatePaymentService.incrementApplicationCount(req.user.sub);
+      
+      return successResponse(
+        { application, remainingApplications: remainingApplications - 1 },
+        'Application submitted successfully'
+      );
+    } catch (error) {
+      throw new BadRequestException(error.message);
     }
-    
-    const jobApplication = await this.jobApplicationService.create(userId, createJobApplicationDto);
-    return successResponse(jobApplication, 'Job application created successfully');
   }
 
   @UseGuards(JwtAuthGuard)

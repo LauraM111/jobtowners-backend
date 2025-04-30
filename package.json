@@ -21,7 +21,9 @@
     "test:e2e": "jest --config ./test/jest-e2e.json",
     "seed": "ts-node -r tsconfig-paths/register src/scripts/run-seeders.ts",
     "init-db": "ts-node -r tsconfig-paths/register src/scripts/init-database.ts",
-    "setup-db": "ts-node -r tsconfig-paths/register src/scripts/setup-database.ts"
+    "setup-db": "ts-node -r tsconfig-paths/register src/scripts/setup-database.ts",
+    "seed:candidate-plan": "ts-node -r tsconfig-paths/register src/scripts/seeders/candidate-plan.seeder.ts",
+    "seed:candidate-plan-standalone": "ts-node -r tsconfig-paths/register src/scripts/run-candidate-plan-seeder.ts"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.787.0",

@@ -302,6 +302,59 @@ async function bootstrap() {
       ) ENGINE=InnoDB CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
     `);
     
+    console.log('Creating candidate_plans table...');
+    await sequelize.query(`
+      CREATE TABLE IF NOT EXISTS candidate_plans (
+        id VARCHAR(36) PRIMARY KEY,
+        name VARCHAR(255) NOT NULL,
+        description TEXT,
+        price DECIMAL(10,2) NOT NULL DEFAULT 15.00,
+        currency VARCHAR(255) NOT NULL DEFAULT 'usd',
+        stripeProductId VARCHAR(255),
+        stripePriceId VARCHAR(255),
+        dailyApplicationLimit INT NOT NULL DEFAULT 15,
+        status VARCHAR(255) NOT NULL DEFAULT 'active',
+        createdAt DATETIME NOT NULL,
+        updatedAt DATETIME NOT NULL,
+        deletedAt DATETIME
+      ) ENGINE=InnoDB CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+    `);
+    
+    console.log('Creating candidate_orders table...');
+    await sequelize.query(`
+      CREATE TABLE IF NOT EXISTS candidate_orders (
+        id VARCHAR(36) PRIMARY KEY,
+        userId VARCHAR(36) NOT NULL,
+        planId VARCHAR(36) NOT NULL,
+        amount DECIMAL(10,2) NOT NULL,
+        currency VARCHAR(255) NOT NULL DEFAULT 'usd',
+        status VARCHAR(255) NOT NULL DEFAULT 'pending',
+        stripePaymentIntentId VARCHAR(255),
+        stripeCustomerId VARCHAR(255),
+        paymentDate DATETIME,
+        createdAt DATETIME NOT NULL,
+        updatedAt DATETIME NOT NULL,
+        CONSTRAINT fk_candidate_orders_user FOREIGN KEY (userId) REFERENCES users(id) ON DELETE CASCADE,
+        CONSTRAINT fk_candidate_orders_plan FOREIGN KEY (planId) REFERENCES candidate_plans(id) ON DELETE CASCADE
+      ) ENGINE=InnoDB CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+    `);
+    
+    console.log('Creating application_limits table...');
+    await sequelize.query(`
+      CREATE TABLE IF NOT EXISTS application_limits (
+        id VARCHAR(36) PRIMARY KEY,
+        userId VARCHAR(36) NOT NULL,
+        dailyLimit INT NOT NULL DEFAULT 15,
+        applicationsUsedToday INT NOT NULL DEFAULT 0,
+        lastResetDate DATE NOT NULL,
+        hasPaid BOOLEAN NOT NULL DEFAULT false,
+        createdAt DATETIME NOT NULL,
+        updatedAt DATETIME NOT NULL,
+        CONSTRAINT fk_application_limits_user FOREIGN KEY (userId) REFERENCES users(id) ON DELETE CASCADE,
+        UNIQUE KEY unique_user_limit (userId)
+      ) ENGINE=InnoDB CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+    `);
+    
     // Re-enable foreign key checks
     await sequelize.query('SET FOREIGN_KEY_CHECKS = 1');
     
