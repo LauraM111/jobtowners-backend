@@ -1,6 +1,6 @@
 import { 
   Controller, Get, Post, Body, Patch, Param, Delete, 
-  UseGuards, Request, NotFoundException, ForbiddenException 
+  UseGuards, Request, NotFoundException, ForbiddenException, BadRequestException 
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
 import { ResumeService } from './resume.service';
@@ -17,6 +17,7 @@ import { UploadCvDto } from './dto/upload-cv.dto';
 import { CreateAttachmentDto } from './dto/create-attachment.dto';
 import { CreateEducationDto } from './dto/create-education.dto';
 import { CreateExperienceDto } from './dto/create-experience.dto';
+import { CurrentUser } from '../auth/decorators/current-user.decorator';
 
 @ApiTags('Resume')
 @Controller('resume')
@@ -51,24 +52,24 @@ export class ResumeController {
   @ApiOperation({ summary: 'Get current user\'s resume' })
   @ApiResponse({ status: 200, description: 'Resume retrieved successfully' })
   @ApiBearerAuth()
-  async findMyResume(@Request() req) {
-    try {
-      const resume = await this.resumeService.findOne(req.user.sub);
-      return successResponse(resume, 'Resume retrieved successfully');
-    } catch (error) {
-      if (error instanceof NotFoundException) {
-        return successResponse(null, 'No resume found for this user');
-      }
-      throw error;
+  async findMine(@Request() req) {
+    const userId = req.user.sub;
+    if (!userId) {
+      throw new BadRequestException('User ID is required');
     }
+    const resume = await this.resumeService.findOne(userId, true);
+    return successResponse(resume, 'Resume retrieved successfully');
   }
 
   @Post()
   @ApiOperation({ summary: 'Create a new resume' })
   @ApiResponse({ status: 201, description: 'Resume created successfully' })
   @ApiBearerAuth()
-  async create(@Request() req, @Body() createResumeDto: CreateResumeDto) {
-    const resume = await this.resumeService.create(req.user.sub, createResumeDto);
+  async create(
+    @CurrentUser('id') userId: string,
+    @Body() createResumeDto: CreateResumeDto
+  ) {
+    const resume = await this.resumeService.create(userId, createResumeDto);
     return successResponse(resume, 'Resume created successfully');
   }
 
@@ -105,12 +106,11 @@ export class ResumeController {
   @ApiOperation({ summary: 'Get a resume by ID' })
   @ApiResponse({ status: 200, description: 'Resume retrieved successfully' })
   @ApiBearerAuth()
-  async findOne(@Param('id') id: string, @Request() req) {
-    const resume = await this.resumeService.findById(id);
+  async findOne(@Param('id') id: string) {
+    const resume = await this.resumeService.findOne(id);
     
-    // Check if the user is the owner or an admin
-    if (resume.userId !== req.user.sub && req.user.role !== UserType.ADMIN) {
-      throw new ForbiddenException('You do not have permission to access this resume');
+    if (!resume) {
+      throw new NotFoundException(`Resume with ID ${id} not found`);
     }
     
     return successResponse(resume, 'Resume retrieved successfully');

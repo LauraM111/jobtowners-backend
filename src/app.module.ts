@@ -20,6 +20,7 @@ import { JobModule } from './modules/job/job.module';
 import { Sequelize } from 'sequelize-typescript';
 import { UserSeeder } from './database/seeders/user.seeder';
 import { DatabaseInitService } from './database/database-init.service';
+import { JobApplicationModule } from './modules/job-application/job-application.module';
 
 // Import entities from their correct locations
 import { User } from './modules/user/entities/user.entity';
@@ -32,6 +33,7 @@ import { Company } from './modules/company/entities/company.entity';
 import { SubscriptionPlan } from './modules/subscription/entities/subscription-plan.entity';
 import { Subscription } from './modules/subscription/entities/subscription.entity';
 import { Job } from './modules/job/entities/job.entity';
+import { JobApplication } from './modules/job-application/entities/job-application.entity';
 
 @Module({
   imports: [
@@ -61,7 +63,8 @@ import { Job } from './modules/job/entities/job.entity';
           Company,
           SubscriptionPlan,
           Subscription,
-          Job
+          Job,
+          JobApplication
         ],
         autoLoadModels: true,
         synchronize: false, // Disable auto-sync to prevent errors
@@ -84,6 +87,7 @@ import { Job } from './modules/job/entities/job.entity';
     CompanyModule,
     SubscriptionModule,
     JobModule,
+    JobApplicationModule,
   ],
   controllers: [AppController],
   providers: [

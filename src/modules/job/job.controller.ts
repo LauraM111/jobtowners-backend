@@ -20,11 +20,15 @@ import { Public } from '../auth/decorators/public.decorator';
 import { VerifyJobDto } from './dto/verify-job.dto';
 import { VerificationStatus } from './entities/job.entity';
 import { JobStatus } from './entities/job.entity';
+import { JwtService } from '@nestjs/jwt';
 
 @ApiTags('Jobs')
 @Controller('jobs')
 export class JobController {
-  constructor(private readonly jobService: JobService) {}
+  constructor(
+    private readonly jobService: JobService,
+    private readonly jwtService: JwtService
+  ) {}
 
   @Post()
   @UseGuards(JwtAuthGuard)
@@ -95,7 +99,6 @@ export class JobController {
   }
 
   @Get()
-  @Public()
   @ApiOperation({ summary: 'Get all jobs' })
   @ApiResponse({ status: 200, description: 'Jobs retrieved successfully' })
   @ApiQuery({ name: 'limit', required: false, type: Number })
@@ -113,7 +116,25 @@ export class JobController {
     @Query('userId') userId?: string,
     @Query('companyId') companyId?: string,
     @Query('search') search?: string,
+    @Request() req?: any,
   ) {
+    // Extract token from Authorization header
+    let currentUserId = null;
+    
+    try {
+      const authHeader = req.headers.authorization;
+      if (authHeader && authHeader.startsWith('Bearer ')) {
+        const token = authHeader.substring(7);
+        // Decode the JWT token to get user ID
+        const decoded = this.jwtService.decode(token);
+        if (decoded && decoded.sub) {
+          currentUserId = decoded.sub;
+        }
+      }
+    } catch (error) {
+      console.log('Error extracting user from token:', error);
+    }
+    
     const { jobs, total } = await this.jobService.findAll({
       limit,
       offset,
@@ -121,7 +142,8 @@ export class JobController {
       verificationStatus,
       userId,
       companyId,
-      search
+      search,
+      currentUserId
     });
     
     return successResponse({ jobs, total }, 'Jobs retrieved successfully');
@@ -167,13 +189,55 @@ export class JobController {
     return successResponse(stats, 'Job statistics retrieved successfully');
   }
 
+  @Get('saved/user/jobs/list')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Get current user\'s saved jobs' })
+  @ApiResponse({ status: 200, description: 'Saved jobs retrieved successfully' })
+  @ApiQuery({ name: 'page', required: false, type: Number })
+  @ApiQuery({ name: 'limit', required: false, type: Number })
+  async getSavedJobs(
+    @Request() req,
+    @Query('page') page?: number,
+    @Query('limit') limit?: number
+  ) {
+    try {
+      const offset = page ? (page - 1) * (limit || 10) : 0;
+      const { jobs, total } = await this.jobService.getSavedJobs(req.user.sub, { limit, offset });
+      return successResponse({ jobs, total, page: page || 1 }, 'Saved jobs retrieved successfully');
+    } catch (error) {
+      throw new BadRequestException(error.message);
+    }
+  }
+
   @Get(':id')
   @ApiOperation({ summary: 'Get a job by ID' })
   @ApiResponse({ status: 200, description: 'Job retrieved successfully' })
   @ApiQuery({ name: 'view', required: false, type: Boolean, description: 'Set to true to increment view count' })
-  async findOne(@Param('id') id: string, @Query('view') view?: boolean) {
+  async findOne(
+    @Param('id') id: string, 
+    @Query('view') view?: boolean,
+    @Request() req?: any
+  ) {
     try {
-      const job = await this.jobService.findOne(id);
+      // Extract token from Authorization header
+      let currentUserId = null;
+      
+      try {
+        const authHeader = req.headers.authorization;
+        if (authHeader && authHeader.startsWith('Bearer ')) {
+          const token = authHeader.substring(7);
+          // Decode the JWT token to get user ID
+          const decoded = this.jwtService.decode(token);
+          if (decoded && decoded.sub) {
+            currentUserId = decoded.sub;
+          }
+        }
+      } catch (error) {
+        console.log('Error extracting user from token:', error);
+      }
+      
+      const job = await this.jobService.findOne(id, currentUserId);
       
       // Increment view count if requested
       if (view === true) {
@@ -292,5 +356,33 @@ export class JobController {
     });
     
     return successResponse({ jobs, total }, 'Company jobs retrieved successfully');
+  }
+
+  @Post(':id/save')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Save a job for later' })
+  @ApiResponse({ status: 200, description: 'Job saved successfully' })
+  async saveJob(@Request() req, @Param('id') id: string) {
+    try {
+      await this.jobService.saveJob(req.user.sub, id);
+      return successResponse(null, 'Job saved successfully');
+    } catch (error) {
+      throw new BadRequestException(error.message);
+    }
+  }
+
+  @Delete(':id/save')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Remove a job from saved jobs' })
+  @ApiResponse({ status: 200, description: 'Job removed from saved jobs' })
+  async unsaveJob(@Request() req, @Param('id') id: string) {
+    try {
+      await this.jobService.unsaveJob(req.user.sub, id);
+      return successResponse(null, 'Job removed from saved jobs');
+    } catch (error) {
+      throw new BadRequestException(error.message);
+    }
   }
 } 

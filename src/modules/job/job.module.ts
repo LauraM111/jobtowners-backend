@@ -7,10 +7,12 @@ import { Job } from './entities/job.entity';
 import { User } from '../user/entities/user.entity';
 import { Company } from '../company/entities/company.entity';
 import { SubscriptionModule } from '../subscription/subscription.module';
+import { JwtModule } from '@nestjs/jwt';
 import { diskStorage } from 'multer';
 import { extname } from 'path';
 import { v4 as uuidv4 } from 'uuid';
 import { existsSync, mkdirSync } from 'fs';
+import { SavedJob } from './entities/saved-job.entity';
 
 // Create uploads directory if it doesn't exist
 const uploadsDir = './uploads/jobs';
@@ -20,7 +22,7 @@ if (!existsSync(uploadsDir)) {
 
 @Module({
   imports: [
-    SequelizeModule.forFeature([Job, User, Company]),
+    SequelizeModule.forFeature([Job, User, Company, SavedJob]),
     MulterModule.register({
       storage: diskStorage({
         destination: './uploads/jobs',
@@ -30,6 +32,7 @@ if (!existsSync(uploadsDir)) {
         },
       }),
     }),
+    JwtModule.register({}), // Just for decoding tokens, no need for secret
     SubscriptionModule,
   ],
   controllers: [JobController],

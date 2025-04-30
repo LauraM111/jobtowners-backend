@@ -267,6 +267,41 @@ async function bootstrap() {
       ) ENGINE=InnoDB CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
     `);
     
+    console.log('Creating job_applications table...');
+    await sequelize.query(`
+      CREATE TABLE IF NOT EXISTS job_applications (
+        id VARCHAR(36) PRIMARY KEY,
+        applicantId VARCHAR(36) NOT NULL,
+        jobId VARCHAR(36) NOT NULL,
+        resumeId VARCHAR(36) NOT NULL,
+        status ENUM('pending', 'approved', 'rejected', 'withdrawn') NOT NULL DEFAULT 'pending',
+        coverLetter TEXT,
+        isResumeViewed BOOLEAN DEFAULT false,
+        viewedAt DATETIME,
+        viewedBy VARCHAR(36),
+        adminNotes TEXT,
+        createdAt DATETIME NOT NULL,
+        updatedAt DATETIME NOT NULL,
+        CONSTRAINT fk_job_applications_applicant FOREIGN KEY (applicantId) REFERENCES users(id) ON DELETE CASCADE,
+        CONSTRAINT fk_job_applications_job FOREIGN KEY (jobId) REFERENCES jobs(id) ON DELETE CASCADE,
+        CONSTRAINT fk_job_applications_resume FOREIGN KEY (resumeId) REFERENCES resumes(id) ON DELETE CASCADE
+      ) ENGINE=InnoDB CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+    `);
+    
+    console.log('Creating saved_jobs table...');
+    await sequelize.query(`
+      CREATE TABLE IF NOT EXISTS saved_jobs (
+        id VARCHAR(36) PRIMARY KEY,
+        userId VARCHAR(36) NOT NULL,
+        jobId VARCHAR(36) NOT NULL,
+        createdAt DATETIME NOT NULL,
+        updatedAt DATETIME NOT NULL,
+        CONSTRAINT fk_saved_jobs_user FOREIGN KEY (userId) REFERENCES users(id) ON DELETE CASCADE,
+        CONSTRAINT fk_saved_jobs_job FOREIGN KEY (jobId) REFERENCES jobs(id) ON DELETE CASCADE,
+        UNIQUE KEY unique_user_job (userId, jobId)
+      ) ENGINE=InnoDB CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+    `);
+    
     // Re-enable foreign key checks
     await sequelize.query('SET FOREIGN_KEY_CHECKS = 1');
     

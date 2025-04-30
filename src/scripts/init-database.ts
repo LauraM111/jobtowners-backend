@@ -1,6 +1,7 @@
 import { NestFactory } from '@nestjs/core';
 import { AppModule } from '../app.module';
 import { Sequelize } from 'sequelize-typescript';
+import { JobApplication } from '../modules/job-application/entities/job-application.entity';
 
 async function bootstrap() {
   const app = await NestFactory.createApplicationContext(AppModule);
@@ -18,5 +19,11 @@ async function bootstrap() {
     await app.close();
   }
 }
+
+// Add JobApplication to the entities array
+const entities = [
+  // ... existing entities ...
+  JobApplication,
+];
 
 bootstrap(); 

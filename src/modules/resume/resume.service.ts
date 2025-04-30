@@ -117,48 +117,41 @@ export class ResumeService {
   }
 
   /**
-   * Find a user's resume
+   * Find a resume by ID or userId
+   * This method handles both finding by ID and finding by userId
    */
-  async findOne(userId: string): Promise<Resume> {
-    const resume = await this.resumeModel.findOne({
-      where: { userId },
-      include: [
-        { model: Education },
-        { model: Experience },
-        { model: Attachment },
-      ],
-    });
-
-    if (!resume) {
-      throw new NotFoundException('Resume not found');
-    }
-
-    return resume;
-  }
-
-  /**
-   * Find a resume by ID
-   */
-  async findById(id: string): Promise<Resume> {
-    console.log(`Finding resume by ID: ${id}`);
+  async findOne(idOrUserId: string, isUserId = false): Promise<Resume> {
+    console.log(`ResumeService.findOne called with ${isUserId ? 'userId' : 'id'}: ${idOrUserId}`);
     
-    const resume = await this.resumeModel.findOne({
-      where: { id },
-      include: [
-        { model: Education },
-        { model: Experience },
-        { model: Attachment },
-        { 
-          model: User,
-          attributes: ['id', 'firstName', 'lastName', 'email']
-        }
-      ]
-    });
-
-    if (!resume) {
-      throw new NotFoundException(`Resume with ID ${id} not found`);
+    let resume: Resume;
+    
+    if (isUserId) {
+      // Find by userId
+      resume = await this.resumeModel.findOne({
+        where: { userId: idOrUserId },
+        include: [
+          { model: Education },
+          { model: Experience },
+          { model: Attachment },
+        ],
+      });
+    } else {
+      // Find by primary key (id)
+      resume = await this.resumeModel.findByPk(idOrUserId, {
+        include: [
+          { model: Education },
+          { model: Experience },
+          { model: Attachment },
+        ],
+      });
     }
-
+    
+    if (!resume) {
+      console.log(`Resume not found with ${isUserId ? 'userId' : 'id'}: ${idOrUserId}`);
+      throw new NotFoundException(`Resume not found`);
+    }
+    
+    console.log('Resume found:', resume.id);
     return resume;
   }
 

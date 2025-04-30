@@ -9,6 +9,7 @@ import { SubscriptionService } from '../subscription/subscription.service';
 import { Op } from 'sequelize';
 import { VerifyJobDto } from './dto/verify-job.dto';
 import { Company } from '../company/entities/company.entity';
+import { SavedJob } from './entities/saved-job.entity';
 
 @Injectable()
 export class JobService {
@@ -23,6 +24,8 @@ export class JobService {
     private companyModel: typeof Company,
     private subscriptionService: SubscriptionService,
     private sequelize: Sequelize,
+    @InjectModel(SavedJob)
+    private savedJobModel: typeof SavedJob,
   ) {}
 
   /**
@@ -109,7 +112,8 @@ export class JobService {
       limit,
       offset = 0,
       userId,
-      companyId
+      companyId,
+      currentUserId
     } = query;
     
     const whereClause: any = {};
@@ -212,13 +216,56 @@ export class JobService {
     
     const jobs = await this.jobModel.findAll(options);
     
+    // If currentUserId is provided, check if the user has applied for each job
+    if (currentUserId) {
+      const jobIds = jobs.map(job => job.id);
+      
+      // Find all applications by this user for these jobs
+      const applications = await this.sequelize.models.JobApplication.findAll({
+        where: {
+          applicantId: currentUserId,
+          jobId: {
+            [Op.in]: jobIds
+          }
+        },
+        attributes: ['jobId']
+      });
+      
+      // Find all saved jobs by this user
+      const savedJobs = await this.savedJobModel.findAll({
+        where: {
+          userId: currentUserId,
+          jobId: {
+            [Op.in]: jobIds
+          }
+        },
+        attributes: ['jobId']
+      });
+      
+      // Create sets of job IDs
+      const appliedJobIds = new Set(applications.map(app => app.get('jobId')));
+      const savedJobIds = new Set(savedJobs.map(saved => saved.get('jobId')));
+      
+      // Add properties to each job
+      const jobsWithStatus = jobs.map(job => {
+        const plainJob = job.get({ plain: true });
+        return {
+          ...plainJob,
+          hasApplied: appliedJobIds.has(job.id),
+          isSaved: savedJobIds.has(job.id)
+        };
+      });
+      
+      return { jobs: jobsWithStatus, total };
+    }
+    
     return { jobs, total };
   }
 
   /**
    * Find one job by ID
    */
-  async findOne(id: string): Promise<Job> {
+  async findOne(id: string, currentUserId?: string): Promise<Job | any> {
     const job = await this.jobModel.findByPk(id, {
       include: [
         {
@@ -234,6 +281,44 @@ export class JobService {
     
     if (!job) {
       throw new NotFoundException(`Job with ID ${id} not found`);
+    }
+    
+    // If currentUserId is provided, check if the user has applied for this job
+    if (currentUserId) {
+      // Find application by this user for this job
+      const application = await this.sequelize.models.JobApplication.findOne({
+        where: {
+          applicantId: currentUserId,
+          jobId: id
+        },
+        attributes: ['id']
+      });
+      
+      // Check if job is saved
+      const savedJob = await this.savedJobModel.findOne({
+        where: {
+          userId: currentUserId,
+          jobId: id
+        },
+        attributes: ['id']
+      });
+      
+      console.log('Current user ID:', currentUserId);
+      console.log('Job ID:', id);
+      console.log('Application found:', !!application);
+      console.log('Saved job found:', !!savedJob);
+      
+      // Convert to plain object and add properties
+      const plainJob = job.get({ plain: true });
+      const result = {
+        ...plainJob,
+        hasApplied: !!application,
+        isSaved: !!savedJob
+      };
+      
+      console.log('Result with properties:', { hasApplied: result.hasApplied, isSaved: result.isSaved });
+      
+      return result;
     }
     
     return job;
@@ -498,5 +583,120 @@ export class JobService {
     }
     
     await job.increment('views');
+  }
+
+  /**
+   * Save a job for a user
+   */
+  async saveJob(userId: string, jobId: string): Promise<SavedJob> {
+    // Check if job exists
+    const job = await this.jobModel.findByPk(jobId);
+    if (!job) {
+      throw new NotFoundException(`Job with ID ${jobId} not found`);
+    }
+
+    // Check if already saved
+    const existingSave = await this.savedJobModel.findOne({
+      where: { userId, jobId }
+    });
+
+    if (existingSave) {
+      return existingSave;
+    }
+
+    // Create new saved job
+    return this.savedJobModel.create({ userId, jobId });
+  }
+
+  /**
+   * Unsave a job for a user
+   */
+  async unsaveJob(userId: string, jobId: string): Promise<void> {
+    const savedJob = await this.savedJobModel.findOne({
+      where: { userId, jobId }
+    });
+
+    if (!savedJob) {
+      throw new NotFoundException('Saved job not found');
+    }
+
+    await savedJob.destroy();
+  }
+
+  /**
+   * Get all saved jobs for a user
+   */
+  async getSavedJobs(userId: string, query: any = {}): Promise<{ jobs: Job[], total: number }> {
+    const { limit, offset = 0 } = query;
+
+    // Find saved job IDs
+    const savedJobs = await this.savedJobModel.findAll({
+      where: { userId },
+      attributes: ['jobId']
+    });
+
+    const jobIds = savedJobs.map(saved => saved.get('jobId'));
+
+    if (jobIds.length === 0) {
+      return { jobs: [], total: 0 };
+    }
+
+    // Get jobs with pagination
+    const whereClause = {
+      id: {
+        [Op.in]: jobIds
+      }
+    };
+
+    const total = await this.jobModel.count({ where: whereClause });
+
+    const options: any = {
+      where: whereClause,
+      order: [['createdAt', 'DESC']],
+      include: [
+        {
+          model: User,
+          attributes: ['id', 'firstName', 'lastName', 'email', 'companyName']
+        },
+        {
+          model: Company,
+          attributes: ['id', 'companyName', 'logoUrl', 'website']
+        }
+      ]
+    };
+
+    // Add pagination if provided
+    if (limit) {
+      options.limit = parseInt(limit);
+      options.offset = parseInt(offset);
+    }
+
+    const jobs = await this.jobModel.findAll(options);
+
+    // Find all applications by this user for these jobs
+    const applications = await this.sequelize.models.JobApplication.findAll({
+      where: {
+        applicantId: userId,
+        jobId: {
+          [Op.in]: jobIds
+        }
+      },
+      attributes: ['jobId']
+    });
+
+    // Create a set of job IDs that the user has applied for
+    const appliedJobIds = new Set(applications.map(app => app.get('jobId')));
+
+    // Add isSaved and hasApplied properties to each job
+    const jobsWithStatus = jobs.map(job => {
+      const plainJob = job.get({ plain: true });
+      return {
+        ...plainJob,
+        isSaved: true,
+        hasApplied: appliedJobIds.has(job.id)
+      };
+    });
+
+    return { jobs: jobsWithStatus, total };
   }
 }
