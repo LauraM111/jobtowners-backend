@@ -20,6 +20,7 @@ import {
   Query,
   UseInterceptors,
   UploadedFile,
+  DefaultValuePipe,
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiParam, ApiBearerAuth } from '@nestjs/swagger';
 import { UserService } from './user.service';
@@ -250,13 +251,42 @@ export class UserController {
     description: 'List of all users',
     type: [User] 
   })
-  async findAll() {
-    const users = await this.userService.findAll();
+  async findAll(
+    @Query('page', new DefaultValuePipe(1), ParseIntPipe) page: number,
+    @Query('limit', new DefaultValuePipe(10), ParseIntPipe) limit: number,
+    @Query('userTypes') userTypesString?: string
+  ) {
+    // Parse user types from query parameter
+    let userTypes: UserType[] = [];
+    
+    if (userTypesString) {
+      try {
+        // If it's a comma-separated string
+        userTypes = userTypesString.split(',') as UserType[];
+      } catch (error) {
+        throw new BadRequestException('Invalid userTypes format');
+      }
+    } else {
+      // Default to only candidates and employers if no userTypes specified
+      userTypes = [UserType.CANDIDATE, UserType.EMPLOYER];
+    }
+    
+    const { users, total } = await this.userService.findAll(page, limit, userTypes);
+    
     const result = users.map(user => {
       const { password, ...userData } = user.toJSON();
       return userData;
     });
-    return successResponse(result, 'Users retrieved successfully');
+    
+    return successResponse({
+      users: result,
+      pagination: {
+        page,
+        limit,
+        total,
+        totalPages: Math.ceil(total / limit)
+      }
+    }, 'Users retrieved successfully');
   }
 
   @Get('pending-approval')

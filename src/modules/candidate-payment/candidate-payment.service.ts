@@ -601,4 +601,61 @@ export class CandidatePaymentService {
       throw error;
     }
   }
+
+  /**
+   * Find all orders with pagination
+   */
+  async findAllOrders(page = 1, limit = 10, status?: string): Promise<{ rows: CandidateOrder[]; count: number }> {
+    const offset = (page - 1) * limit;
+    
+    // Build the where clause
+    const where: any = {};
+    
+    // Add status filter if provided
+    if (status) {
+      where.status = status;
+    }
+    
+    // Find orders with pagination
+    return this.candidateOrderModel.findAndCountAll({
+      where,
+      limit,
+      offset,
+      order: [['createdAt', 'DESC']],
+      include: [
+        {
+          model: this.candidatePlanModel,
+          as: 'plan'
+        },
+        {
+          model: this.userModel,
+          attributes: ['id', 'firstName', 'lastName', 'email', 'userType']
+        }
+      ]
+    });
+  }
+
+  /**
+   * Find an order by ID with related data
+   */
+  async findOrderById(id: string): Promise<CandidateOrder> {
+    const order = await this.candidateOrderModel.findByPk(id, {
+      include: [
+        {
+          model: this.candidatePlanModel,
+          as: 'plan'
+        },
+        {
+          model: this.userModel,
+          attributes: ['id', 'firstName', 'lastName', 'email', 'userType']
+        }
+      ]
+    });
+    
+    if (!order) {
+      throw new NotFoundException(`Order with ID ${id} not found`);
+    }
+    
+    return order;
+  }
 } 

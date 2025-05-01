@@ -1,4 +1,4 @@
-import { Controller, Get, Param, UseGuards, Request, NotFoundException, BadRequestException } from '@nestjs/common';
+import { Controller, Get, Param, UseGuards, Request, NotFoundException, BadRequestException, Query, DefaultValuePipe, ParseIntPipe } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth, ApiParam } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
@@ -6,7 +6,7 @@ import { Roles } from '../auth/decorators/roles.decorator';
 import { UserService } from './user.service';
 import { ResumeService } from '../resume/resume.service';
 import { SubscriptionService } from '../subscription/subscription.service';
-import { OrderService } from '../order/order.service';
+import { CandidatePaymentService } from '../candidate-payment/candidate-payment.service';
 import { successResponse } from '../../common/helpers/response.helper';
 
 @ApiTags('User Profiles')
@@ -17,7 +17,7 @@ export class UserProfileController {
     private readonly userService: UserService,
     private readonly resumeService: ResumeService,
     private readonly subscriptionService: SubscriptionService,
-    private readonly orderService: OrderService
+    private readonly candidatePaymentService: CandidatePaymentService
   ) {}
 
   @Get('my-complete-profile')
@@ -60,15 +60,6 @@ export class UserProfileController {
         } catch (error) {
           console.log('No resume found for user');
           profileData.resume = null;
-        }
-        
-        // Get order history for candidates
-        try {
-          const orders = await this.orderService.findByUserId(userId);
-          profileData.orders = orders;
-        } catch (error) {
-          console.log('No orders found for user');
-          profileData.orders = [];
         }
       }
       
@@ -294,23 +285,11 @@ export class UserProfileController {
         // Get all orders (not just active ones)
         try {
           console.log('Fetching orders...');
-          let orders = await this.orderService.findByUserId(userId);
-          
-          // If no orders exist, create a sample one for testing
-          if (!orders || orders.length === 0) {
-            console.log('No orders found, creating a sample one...');
-            try {
-              orders = await this.orderService.createSampleOrderIfNoneExist(userId);
-              console.log(`Created sample order for user: ${userId}`);
-            } catch (createError) {
-              console.error('Error creating sample order:', createError);
-            }
-          }
-          
-          userData.orders = orders || [];
-          console.log(`Found/created ${orders?.length || 0} orders`);
+          const paymentStats = await this.candidatePaymentService.getUserPaymentStats(userId);
+          userData.orders = paymentStats.paymentHistory || [];
+          console.log(`Found ${userData.orders.length} orders`);
         } catch (error) {
-          console.error('Error fetching/creating orders:', error);
+          console.error('Error fetching orders:', error);
           userData.orders = [];
         }
         
@@ -348,6 +327,344 @@ export class UserProfileController {
       return successResponse(userData, 'User details retrieved successfully');
     } catch (error) {
       console.error('Error retrieving user details:', error);
+      throw new BadRequestException(error.message);
+    }
+  }
+
+  @Get('admin/candidate/:candidateId/orders')
+  @Roles('admin')
+  @UseGuards(RolesGuard)
+  @ApiOperation({ summary: 'Get candidate order history (Admin only)' })
+  @ApiResponse({ status: 200, description: 'Candidate orders retrieved successfully' })
+  @ApiParam({ name: 'candidateId', description: 'ID of the candidate' })
+  @ApiBearerAuth()
+  async getCandidateOrders(@Param('candidateId') candidateId: string) {
+    try {
+      // Verify the user exists and is a candidate
+      const user = await this.userService.findById(candidateId);
+      
+      if (!user) {
+        throw new NotFoundException('Candidate not found');
+      }
+      
+      if (user.userType !== 'candidate') {
+        throw new BadRequestException('User is not a candidate');
+      }
+      
+      console.log(`Fetching orders for candidate: ${candidateId}`);
+      
+      // Get payment stats which includes order history
+      const paymentStats = await this.candidatePaymentService.getUserPaymentStats(candidateId);
+      
+      return successResponse({
+        candidate: {
+          id: user.id,
+          firstName: user.firstName,
+          lastName: user.lastName,
+          email: user.email
+        },
+        orders: paymentStats.paymentHistory || []
+      }, 'Candidate orders retrieved successfully');
+    } catch (error) {
+      console.error('Error retrieving candidate orders:', error);
+      throw new BadRequestException(error.message);
+    }
+  }
+
+  @Get('admin/candidate/:candidateId/plans')
+  @Roles('admin')
+  @UseGuards(RolesGuard)
+  @ApiOperation({ summary: 'Get candidate subscription plans (Admin only)' })
+  @ApiResponse({ status: 200, description: 'Candidate plans retrieved successfully' })
+  @ApiParam({ name: 'candidateId', description: 'ID of the candidate' })
+  @ApiBearerAuth()
+  async getCandidatePlans(@Param('candidateId') candidateId: string) {
+    try {
+      // Verify the user exists and is a candidate
+      const user = await this.userService.findById(candidateId);
+      
+      if (!user) {
+        throw new NotFoundException('Candidate not found');
+      }
+      
+      if (user.userType !== 'candidate') {
+        throw new BadRequestException('User is not a candidate');
+      }
+      
+      console.log(`Fetching subscription plans for candidate: ${candidateId}`);
+      
+      // Get all subscription plans for the candidate
+      const plans = await this.subscriptionService.findAllSubscriptionsByUserId(candidateId);
+      
+      return successResponse({
+        candidate: {
+          id: user.id,
+          firstName: user.firstName,
+          lastName: user.lastName,
+          email: user.email
+        },
+        plans
+      }, 'Candidate subscription plans retrieved successfully');
+    } catch (error) {
+      console.error('Error retrieving candidate plans:', error);
+      throw new BadRequestException(error.message);
+    }
+  }
+
+  @Get('admin/employer/:employerId/subscriptions')
+  @Roles('admin')
+  @UseGuards(RolesGuard)
+  @ApiOperation({ summary: 'Get employer subscriptions (Admin only)' })
+  @ApiResponse({ status: 200, description: 'Employer subscriptions retrieved successfully' })
+  @ApiParam({ name: 'employerId', description: 'ID of the employer' })
+  @ApiBearerAuth()
+  async getEmployerSubscriptions(@Param('employerId') employerId: string) {
+    try {
+      // Verify the user exists and is an employer
+      const user = await this.userService.findById(employerId);
+      
+      if (!user) {
+        throw new NotFoundException('Employer not found');
+      }
+      
+      if (user.userType !== 'employer') {
+        throw new BadRequestException('User is not an employer');
+      }
+      
+      console.log(`Fetching subscriptions for employer: ${employerId}`);
+      
+      // Get all subscriptions for the employer
+      const subscriptions = await this.subscriptionService.findAllSubscriptionsByUserId(employerId);
+      
+      return successResponse({
+        employer: {
+          id: user.id,
+          firstName: user.firstName,
+          lastName: user.lastName,
+          email: user.email,
+          companyName: user.companyName
+        },
+        subscriptions
+      }, 'Employer subscriptions retrieved successfully');
+    } catch (error) {
+      console.error('Error retrieving employer subscriptions:', error);
+      throw new BadRequestException(error.message);
+    }
+  }
+
+  @Get('admin/employer/:employerId/subscription-plans')
+  @Roles('admin')
+  @UseGuards(RolesGuard)
+  @ApiOperation({ summary: 'Get employer subscription plans (Admin only)' })
+  @ApiResponse({ status: 200, description: 'Employer subscription plans retrieved successfully' })
+  @ApiParam({ name: 'employerId', description: 'ID of the employer' })
+  @ApiBearerAuth()
+  async getEmployerSubscriptionPlans(@Param('employerId') employerId: string) {
+    try {
+      // Verify the user exists and is an employer
+      const user = await this.userService.findById(employerId);
+      
+      if (!user) {
+        throw new NotFoundException('Employer not found');
+      }
+      
+      if (user.userType !== 'employer') {
+        throw new BadRequestException('User is not an employer');
+      }
+      
+      console.log(`Fetching subscription plans for employer: ${employerId}`);
+      
+      // Get all subscriptions with their plans
+      const subscriptions = await this.subscriptionService.findAllSubscriptionsByUserId(employerId);
+      
+      // Extract unique plans from subscriptions
+      const plans = subscriptions.map(subscription => subscription.plan).filter(Boolean);
+      
+      return successResponse({
+        employer: {
+          id: user.id,
+          firstName: user.firstName,
+          lastName: user.lastName,
+          email: user.email,
+          companyName: user.companyName
+        },
+        plans
+      }, 'Employer subscription plans retrieved successfully');
+    } catch (error) {
+      console.error('Error retrieving employer subscription plans:', error);
+      throw new BadRequestException(error.message);
+    }
+  }
+
+  @Get('my-orders')
+  @ApiOperation({ summary: 'Get current user\'s order history' })
+  @ApiResponse({ status: 200, description: 'Orders retrieved successfully' })
+  @ApiBearerAuth()
+  async getMyOrders(@Request() req) {
+    try {
+      const userId = req.user.sub;
+      const userType = req.user.userType;
+      
+      // Only candidates should have orders
+      if (userType !== 'candidate') {
+        throw new BadRequestException('Only candidates can have orders');
+      }
+      
+      // Get payment stats which includes order history
+      const paymentStats = await this.candidatePaymentService.getUserPaymentStats(userId);
+      
+      return successResponse(paymentStats.paymentHistory || [], 'Orders retrieved successfully');
+    } catch (error) {
+      console.error('Error retrieving orders:', error);
+      throw new BadRequestException(error.message);
+    }
+  }
+
+  @Get('my-subscriptions')
+  @ApiOperation({ summary: 'Get current user\'s subscriptions' })
+  @ApiResponse({ status: 200, description: 'Subscriptions retrieved successfully' })
+  @ApiBearerAuth()
+  async getMySubscriptions(@Request() req) {
+    try {
+      const userId = req.user.sub;
+      
+      // Get all subscriptions for the user
+      const subscriptions = await this.subscriptionService.findAllSubscriptionsByUserId(userId);
+      
+      return successResponse(subscriptions, 'Subscriptions retrieved successfully');
+    } catch (error) {
+      console.error('Error retrieving subscriptions:', error);
+      throw new BadRequestException(error.message);
+    }
+  }
+
+  @Get('admin/all-subscriptions')
+  @Roles('admin')
+  @UseGuards(RolesGuard)
+  @ApiOperation({ summary: 'Get all subscriptions in the system (Admin only)' })
+  @ApiResponse({ status: 200, description: 'All subscriptions retrieved successfully' })
+  @ApiBearerAuth()
+  async getAllSubscriptions(
+    @Query('page', new DefaultValuePipe(1), ParseIntPipe) page: number,
+    @Query('limit', new DefaultValuePipe(10), ParseIntPipe) limit: number,
+    @Query('status') status?: string
+  ) {
+    try {
+      // Get all subscriptions with pagination
+      const { subscriptions, total } = await this.subscriptionService.findAllSubscriptions(page, limit, status);
+      
+      return successResponse({
+        subscriptions,
+        pagination: {
+          page,
+          limit,
+          total,
+          totalPages: Math.ceil(total / limit)
+        }
+      }, 'All subscriptions retrieved successfully');
+    } catch (error) {
+      console.error('Error retrieving all subscriptions:', error);
+      throw new BadRequestException(error.message);
+    }
+  }
+
+  @Get('admin/all-orders')
+  @Roles('admin')
+  @UseGuards(RolesGuard)
+  @ApiOperation({ summary: 'Get all orders in the system (Admin only)' })
+  @ApiResponse({ status: 200, description: 'All orders retrieved successfully' })
+  @ApiBearerAuth()
+  async getAllOrders(
+    @Query('page', new DefaultValuePipe(1), ParseIntPipe) page: number,
+    @Query('limit', new DefaultValuePipe(10), ParseIntPipe) limit: number,
+    @Query('status') status?: string
+  ) {
+    try {
+      // Get all candidate orders
+      const { rows: orders, count: total } = await this.candidatePaymentService.findAllOrders(page, limit, status);
+      
+      return successResponse({
+        orders,
+        pagination: {
+          page,
+          limit,
+          total,
+          totalPages: Math.ceil(total / limit)
+        }
+      }, 'All orders retrieved successfully');
+    } catch (error) {
+      console.error('Error retrieving all orders:', error);
+      throw new BadRequestException(error.message);
+    }
+  }
+
+  @Get('admin/order/:orderId')
+  @Roles('admin')
+  @UseGuards(RolesGuard)
+  @ApiOperation({ summary: 'Get order details by ID (Admin only)' })
+  @ApiResponse({ status: 200, description: 'Order details retrieved successfully' })
+  @ApiParam({ name: 'orderId', description: 'ID of the order' })
+  @ApiBearerAuth()
+  async getOrderDetails(@Param('orderId') orderId: string) {
+    try {
+      // Find the order with related data
+      const order = await this.candidatePaymentService.findOrderById(orderId);
+      
+      if (!order) {
+        throw new NotFoundException(`Order with ID ${orderId} not found`);
+      }
+      
+      // Get the user who placed the order
+      const user = await this.userService.findById(order.userId);
+      
+      return successResponse({
+        order,
+        user: {
+          id: user.id,
+          firstName: user.firstName,
+          lastName: user.lastName,
+          email: user.email,
+          userType: user.userType
+        }
+      }, 'Order details retrieved successfully');
+    } catch (error) {
+      console.error('Error retrieving order details:', error);
+      throw new BadRequestException(error.message);
+    }
+  }
+
+  @Get('admin/subscription/:subscriptionId')
+  @Roles('admin')
+  @UseGuards(RolesGuard)
+  @ApiOperation({ summary: 'Get subscription details by ID (Admin only)' })
+  @ApiResponse({ status: 200, description: 'Subscription details retrieved successfully' })
+  @ApiParam({ name: 'subscriptionId', description: 'ID of the subscription' })
+  @ApiBearerAuth()
+  async getSubscriptionDetails(@Param('subscriptionId') subscriptionId: string) {
+    try {
+      // Get the subscription with related data
+      const subscription = await this.subscriptionService.findSubscriptionById(subscriptionId);
+      
+      if (!subscription) {
+        throw new NotFoundException(`Subscription with ID ${subscriptionId} not found`);
+      }
+      
+      // Get the user who owns this subscription
+      const user = await this.userService.findById(subscription.userId);
+      
+      return successResponse({
+        subscription,
+        user: {
+          id: user.id,
+          firstName: user.firstName,
+          lastName: user.lastName,
+          email: user.email,
+          userType: user.userType,
+          companyName: user.companyName
+        }
+      }, 'Subscription details retrieved successfully');
+    } catch (error) {
+      console.error('Error retrieving subscription details:', error);
       throw new BadRequestException(error.message);
     }
   }

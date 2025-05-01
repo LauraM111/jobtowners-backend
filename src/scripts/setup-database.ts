@@ -274,7 +274,7 @@ async function bootstrap() {
         applicantId VARCHAR(36) NOT NULL,
         jobId VARCHAR(36) NOT NULL,
         resumeId VARCHAR(36) NOT NULL,
-        status ENUM('pending', 'approved', 'rejected', 'withdrawn') NOT NULL DEFAULT 'pending',
+        status ENUM('pending', 'approved', 'reviewed', 'shortlisted', 'rejected', 'hired', 'withdrawn') NOT NULL DEFAULT 'pending',
         coverLetter TEXT,
         isResumeViewed BOOLEAN DEFAULT false,
         viewedAt DATETIME,

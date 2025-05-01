@@ -281,7 +281,7 @@ export class DatabaseInitService implements OnModuleInit {
           applicantId VARCHAR(36) NOT NULL,
           jobId VARCHAR(36) NOT NULL,
           resumeId VARCHAR(36) NOT NULL,
-          status ENUM('pending', 'approved', 'rejected', 'withdrawn') NOT NULL DEFAULT 'pending',
+          status ENUM('pending', 'approved', 'reviewed', 'shortlisted', 'rejected', 'hired', 'withdrawn') NOT NULL DEFAULT 'pending',
           coverLetter TEXT,
           isResumeViewed BOOLEAN DEFAULT false,
           viewedAt DATETIME,
@@ -294,6 +294,7 @@ export class DatabaseInitService implements OnModuleInit {
           CONSTRAINT fk_job_applications_resume FOREIGN KEY (resumeId) REFERENCES resumes(id) ON DELETE CASCADE
         ) ENGINE=InnoDB CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
       `);
+      
       
       // Create saved_jobs table
       await this.sequelize.query(`

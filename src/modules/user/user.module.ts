@@ -9,8 +9,8 @@ import { AuthModule } from '../auth/auth.module';
 import { UploadModule } from '../upload/upload.module';
 import { ResumeModule } from '../resume/resume.module';
 import { SubscriptionModule } from '../subscription/subscription.module';
-import { OrderModule } from '../order/order.module';
 import { CompanyModule } from '../company/company.module';
+import { CandidatePaymentModule } from '../candidate-payment/candidate-payment.module';
 
 @Module({
   imports: [
@@ -20,7 +20,7 @@ import { CompanyModule } from '../company/company.module';
     UploadModule,
     forwardRef(() => ResumeModule),
     forwardRef(() => SubscriptionModule),
-    forwardRef(() => OrderModule),
+    forwardRef(() => CandidatePaymentModule),
     forwardRef(() => CompanyModule),
   ],
   controllers: [UserController, UserProfileController],

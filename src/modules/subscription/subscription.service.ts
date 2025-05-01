@@ -404,4 +404,66 @@ export class SubscriptionService {
       order: [['createdAt', 'DESC']]
     });
   }
+
+  /**
+   * Find all subscriptions with pagination
+   */
+  async findAllSubscriptions(page = 1, limit = 10, status?: string): Promise<{ subscriptions: Subscription[]; total: number }> {
+    const offset = (page - 1) * limit;
+    
+    // Build the where clause
+    const where: any = {};
+    
+    // Add status filter if provided
+    if (status) {
+      where.status = status;
+    }
+    
+    // Find subscriptions with pagination
+    const { count, rows } = await this.subscriptionModel.findAndCountAll({
+      where,
+      limit,
+      offset,
+      order: [['createdAt', 'DESC']],
+      include: [
+        {
+          model: this.subscriptionPlanModel,
+          as: 'plan'
+        },
+        {
+          model: this.userModel,
+          attributes: ['id', 'firstName', 'lastName', 'email', 'userType', 'companyName']
+        }
+      ]
+    });
+    
+    return {
+      subscriptions: rows,
+      total: count
+    };
+  }
+
+  /**
+   * Find a subscription by ID with related data
+   */
+  async findSubscriptionById(id: string): Promise<Subscription> {
+    const subscription = await this.subscriptionModel.findByPk(id, {
+      include: [
+        {
+          model: this.subscriptionPlanModel,
+          as: 'plan'
+        },
+        {
+          model: this.userModel,
+          attributes: ['id', 'firstName', 'lastName', 'email', 'userType', 'companyName']
+        }
+      ]
+    });
+    
+    if (!subscription) {
+      throw new NotFoundException(`Subscription with ID ${id} not found`);
+    }
+    
+    return subscription;
+  }
 } 

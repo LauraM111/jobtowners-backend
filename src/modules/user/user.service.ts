@@ -17,6 +17,7 @@ import { AdminUpdateUserDto } from './dto/admin-update-user.dto';
 import { ResumeService } from '../resume/resume.service';
 import { CompanyService } from '../company/company.service';
 import { UpdateProfileDto } from './dto/update-profile.dto';
+import { Op } from 'sequelize';
 
 @Injectable()
 export class UserService {
@@ -225,10 +226,34 @@ export class UserService {
   }
 
   /**
-   * Find all users
+   * Find all users with pagination and filtering
    */
-  async findAll(): Promise<User[]> {
-    return this.userModel.findAll();
+  async findAll(page = 1, limit = 10, userTypes?: UserType[]): Promise<{ users: User[]; total: number }> {
+    const offset = (page - 1) * limit;
+    
+    // Build the where clause
+    const where: any = {};
+    
+    // Add user type filter if provided
+    if (userTypes && userTypes.length > 0) {
+      where.userType = {
+        [Op.in]: userTypes
+      };
+    }
+    
+    // Find users with pagination
+    const { count, rows } = await this.userModel.findAndCountAll({
+      where,
+      limit,
+      offset,
+      order: [['createdAt', 'DESC']],
+      attributes: { exclude: ['password'] } // Exclude password from the response
+    });
+    
+    return {
+      users: rows,
+      total: count
+    };
   }
 
   /**
