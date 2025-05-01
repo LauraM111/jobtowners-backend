@@ -8,9 +8,11 @@ import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles, UserType } from '../auth/decorators/roles.decorator';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { JobApplication } from './entities/job-application.entity';
-import { ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
+import { ApiOperation, ApiResponse, ApiBearerAuth, ApiBody } from '@nestjs/swagger';
 import { successResponse } from '../../utils/response-utils';
 import { CandidatePaymentService } from '../candidate-payment/candidate-payment.service';
+import { JobApplicationStatus } from './entities/job-application.entity';
+import { UpdateStatusDto } from './dto/update-status.dto';
 
 @Controller('job-applications')
 export class JobApplicationController {
@@ -124,5 +126,52 @@ export class JobApplicationController {
     @CurrentUser('isAdmin') isAdmin: boolean,
   ): Promise<void> {
     return this.jobApplicationService.remove(id, userId, isAdmin);
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Patch(':id/status')
+  @ApiOperation({ summary: 'Update job application status' })
+  @ApiResponse({ status: 200, description: 'Status updated successfully' })
+  @ApiBody({
+    schema: {
+      type: 'object',
+      properties: {
+        status: {
+          type: 'string',
+          enum: Object.values(JobApplicationStatus),
+          example: 'approved'
+        }
+      }
+    }
+  })
+  async updateStatus(
+    @Param('id') id: string,
+    @Body() updateStatusDto: UpdateStatusDto,
+    @Request() req,
+  ) {
+    try {
+      const userId = req.user.sub;
+      const isAdmin = req.user.isAdmin;
+      
+      console.log('Updating status:', {
+        id,
+        status: updateStatusDto.status,
+        userId,
+        isAdmin,
+        validStatuses: Object.values(JobApplicationStatus)
+      });
+      
+      const application = await this.jobApplicationService.updateStatus(
+        id, 
+        updateStatusDto.status, 
+        userId, 
+        isAdmin
+      );
+      
+      return successResponse(application, 'Application status updated successfully');
+    } catch (error) {
+      console.error('Error updating status:', error.message);
+      throw new BadRequestException(error.message);
+    }
   }
 } 

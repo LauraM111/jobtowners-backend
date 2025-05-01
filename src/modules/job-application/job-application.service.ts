@@ -397,4 +397,53 @@ export class JobApplicationService {
     // Convert map to array
     return Array.from(applicantsMap.values());
   }
+
+  /**
+   * Update just the status of a job application
+   */
+  async updateStatus(id: string, status: JobApplicationStatus, userId: string, isAdmin = false): Promise<JobApplication> {
+    const jobApplication = await this.findOne(id, userId, isAdmin);
+    
+    console.log('Status update request:', {
+      currentStatus: jobApplication.status,
+      newStatus: status,
+      isApplicant: jobApplication.applicantId === userId,
+      validStatuses: Object.values(JobApplicationStatus)
+    });
+    
+    // Check permissions based on the status change
+    if (!isAdmin) {
+      // If user is the applicant
+      if (jobApplication.applicantId === userId) {
+        // Applicants can only withdraw their applications
+        if (status !== JobApplicationStatus.WITHDRAWN) {
+          throw new ForbiddenException('You can only withdraw your application');
+        }
+      } 
+      // If user is the employer
+      else {
+        // Check if the employer owns the job
+        const job = await this.jobService.findOne(jobApplication.jobId);
+        
+        console.log('Employer job check:', {
+          jobUserId: job.userId,
+          requestUserId: userId,
+          isOwner: job.userId === userId
+        });
+        
+        if (job.userId !== userId) {
+          throw new ForbiddenException('You do not have permission to update this application');
+        }
+        
+        // Employers can use all statuses except WITHDRAWN (which is reserved for candidates)
+        if (status === JobApplicationStatus.WITHDRAWN) {
+          throw new ForbiddenException('Only candidates can withdraw applications');
+        }
+      }
+    }
+
+    // Update the status
+    await jobApplication.update({ status });
+    return jobApplication;
+  }
 } 

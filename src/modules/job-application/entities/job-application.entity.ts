@@ -16,8 +16,10 @@ import { Resume } from '../../resume/entities/resume.entity';
 
 export enum JobApplicationStatus {
   PENDING = 'pending',
-  APPROVED = 'approved',
+  REVIEWED = 'reviewed',
+  SHORTLISTED = 'shortlisted',
   REJECTED = 'rejected',
+  HIRED = 'hired',
   WITHDRAWN = 'withdrawn'
 }
 
