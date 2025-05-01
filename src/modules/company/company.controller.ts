@@ -1,9 +1,10 @@
 import { 
   Controller, Get, Post, Body, Patch, Param, Delete, 
   UseGuards, Request, Query, ForbiddenException, NotFoundException, BadRequestException,
-  UsePipes
+  UsePipes, UseInterceptors, UploadedFile, Put
 } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth, ApiQuery } from '@nestjs/swagger';
+import { FileInterceptor } from '@nestjs/platform-express';
+import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth, ApiQuery, ApiConsumes } from '@nestjs/swagger';
 import { CompanyService } from './company.service';
 import { CreateCompanyDto } from './dto/create-company.dto';
 import { UpdateCompanyDto } from './dto/update-company.dto';
@@ -15,12 +16,19 @@ import { successResponse } from '../../common/helpers/response.helper';
 import { CompanyStatus } from './enums/company-status.enum';
 import { CompanyUpdatePipe } from './pipes/company-update.pipe';
 import { Company } from './entities/company.entity';
+import { diskStorage } from 'multer';
+import { extname } from 'path';
+import { v4 as uuidv4 } from 'uuid';
+import { UploadService } from '../upload/upload.service';
 
 @ApiTags('Companies')
 @Controller('companies')
 @UseGuards(JwtAuthGuard)
 export class CompanyController {
-  constructor(private readonly companyService: CompanyService) {}
+  constructor(
+    private readonly companyService: CompanyService,
+    private readonly uploadService: UploadService
+  ) {}
 
   @Post()
   @ApiOperation({ summary: 'Create a new company' })
@@ -125,33 +133,84 @@ export class CompanyController {
     return successResponse(company, 'Company retrieved successfully');
   }
 
-  @Patch(':id')
+  @Put(':id')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
   @ApiOperation({ summary: 'Update a company' })
   @ApiResponse({ status: 200, description: 'Company updated successfully' })
-  @ApiBearerAuth()
-  @UsePipes(new CompanyUpdatePipe())
-  async update(@Param('id') id: string, @Body() updateCompanyDto: UpdateCompanyDto, @Request() req) {
+  @ApiConsumes('multipart/form-data')
+  @UseInterceptors(FileInterceptor('logo', {
+    storage: diskStorage({
+      destination: './uploads/company-logos',
+      filename: (req, file, cb) => {
+        const randomName = uuidv4();
+        return cb(null, `${randomName}${extname(file.originalname)}`);
+      },
+    }),
+    fileFilter: (req, file, cb) => {
+      if (!file.originalname.match(/\.(jpg|jpeg|png|gif)$/)) {
+        return cb(new BadRequestException('Only image files are allowed!'), false);
+      }
+      cb(null, true);
+    },
+    limits: {
+      fileSize: 2 * 1024 * 1024, // 2MB
+    },
+  }))
+  async update(
+    @Request() req,
+    @Param('id') id: string,
+    @Body() updateCompanyDto: UpdateCompanyDto,
+    @UploadedFile() logo?: Express.Multer.File
+  ) {
     try {
-      // Get the company to check ownership
+      // Check if the user has permission to update this company
       const company = await this.companyService.findOne(id);
       
-      // Only allow the creator or admin to update the company
-      if (company.createdBy !== req.user.sub && req.user.role !== UserType.ADMIN) {
-        throw new ForbiddenException('You do not have permission to update this company');
+      if (!company) {
+        throw new BadRequestException('Company not found');
       }
       
-      // No need to sanitize here since the pipe already did it
-      const updatedCompany = await this.companyService.update(id, req.user.sub, updateCompanyDto);
+      if (company.userId !== req.user.sub && req.user.userType !== UserType.ADMIN) {
+        throw new BadRequestException('You do not have permission to update this company');
+      }
+      
+      // If a new logo was uploaded, process it
+      let logoUrl = null;
+      if (logo) {
+        // Upload to DigitalOcean Spaces
+        logoUrl = await this.uploadService.uploadFile(
+          logo.buffer,
+          'company-logos',
+          logo.originalname
+        );
+      }
+      
+      // Filter out properties that shouldn't be updated
+      const allowedFields = [
+        'companyName', 'website', 'foundedYear', 'companySize',
+        'industry', 'description', 'socialLinks', 'contactEmail',
+        'contactPhone', 'address'
+      ];
+      
+      // Create a clean DTO with only allowed fields
+      const cleanUpdateDto = Object.keys(updateCompanyDto)
+        .filter(key => allowedFields.includes(key))
+        .reduce((obj, key) => {
+          obj[key] = updateCompanyDto[key];
+          return obj;
+        }, {});
+      
+      // Add logo URL if it exists
+      if (logoUrl) {
+        cleanUpdateDto['logoUrl'] = logoUrl;
+      }
+      
+      const updatedCompany = await this.companyService.update(id, req.user.sub, cleanUpdateDto);
       return successResponse(updatedCompany, 'Company updated successfully');
     } catch (error) {
-      if (error instanceof ForbiddenException) {
-        throw error;
-      }
-      if (error instanceof NotFoundException) {
-        throw error;
-      }
       console.error('Error updating company:', error);
-      throw new BadRequestException(error.message || 'Failed to update company');
+      throw new BadRequestException(error.message);
     }
   }
 

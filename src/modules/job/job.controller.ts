@@ -1,7 +1,7 @@
 import { 
   Controller, Get, Post, Body, Patch, Param, Delete, 
   UseGuards, Request, Query, UseInterceptors, UploadedFile,
-  BadRequestException, UploadedFiles
+  BadRequestException, UploadedFiles, Put
 } from '@nestjs/common';
 import { FileInterceptor, FilesInterceptor } from '@nestjs/platform-express';
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth, ApiConsumes, ApiBody, ApiQuery } from '@nestjs/swagger';
@@ -250,7 +250,7 @@ export class JobController {
     }
   }
 
-  @Patch(':id')
+  @Patch(':id/update-details')
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Update a job' })
@@ -277,14 +277,56 @@ export class JobController {
   async update(
     @Request() req,
     @Param('id') id: string,
-    @Body() updateJobDto: UpdateJobDto,
+    @Body() rawUpdateData: any,
     @UploadedFile() attachment: Express.Multer.File
   ) {
     try {
+      // Define allowed fields for update
+      const allowedFields = [
+        'jobTitle', 'title', 'jobDescription', 'emailAddress', 'specialisms',
+        'category', 'jobType', 'offeredSalary', 'careerLevel', 'experience',
+        'gender', 'industry', 'qualification', 'applicationDeadlineDate',
+        'country', 'city', 'completeAddress', 'status', 'additionalAttachments',
+        'companyId'
+      ];
+      
+      // Create a clean DTO with proper typing
+      const cleanUpdateDto: Record<string, any> = {};
+      
+      // Only copy allowed fields
+      for (const field of allowedFields) {
+        if (field in rawUpdateData) {
+          cleanUpdateDto[field] = rawUpdateData[field];
+        }
+      }
+      
+      // Special handling for additionalAttachments if it's a string
+      if (typeof cleanUpdateDto.additionalAttachments === 'string') {
+        try {
+          cleanUpdateDto.additionalAttachments = JSON.parse(cleanUpdateDto.additionalAttachments);
+        } catch (e) {
+          // If it's not valid JSON, keep it as is
+          console.log('Could not parse additionalAttachments as JSON:', e);
+        }
+      }
+      
+      // Special handling for specialisms if it's a string
+      if (typeof cleanUpdateDto.specialisms === 'string') {
+        try {
+          cleanUpdateDto.specialisms = JSON.parse(cleanUpdateDto.specialisms);
+        } catch (e) {
+          // If it's not valid JSON, keep it as is
+          console.log('Could not parse specialisms as JSON:', e);
+        }
+      }
+      
+      console.log('Clean update DTO:', cleanUpdateDto);
+      
       const attachmentUrl = attachment ? `/uploads/jobs/${attachment.filename}` : null;
-      const job = await this.jobService.update(id, req.user.sub, updateJobDto, attachmentUrl);
+      const job = await this.jobService.update(id, req.user.sub, cleanUpdateDto, attachmentUrl);
       return successResponse(job, 'Job updated successfully');
     } catch (error) {
+      console.error('Error updating job:', error);
       throw new BadRequestException(error.message);
     }
   }
