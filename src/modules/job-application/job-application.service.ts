@@ -9,9 +9,12 @@ import { JobService } from '../job/job.service';
 import { ResumeService } from '../resume/resume.service';
 import { UserService } from '../user/user.service';
 import { SubscriptionService } from '../subscription/subscription.service';
-import { User } from '../user/entities/user.entity';
+import { User, UserType } from '../user/entities/user.entity';
 import { Resume } from '../resume/entities/resume.entity';
 import { Job } from '../job/entities/job.entity';
+import { Education } from '../resume/entities/education.entity';
+import { Experience } from '../resume/entities/experience.entity';
+import { Attachment } from '../resume/entities/attachment.entity';
 
 @Injectable()
 export class JobApplicationService {
@@ -28,6 +31,12 @@ export class JobApplicationService {
     private resumeModel: typeof Resume,
     @InjectModel(Job)
     private jobModel: typeof Job,
+    @InjectModel(Education)
+    private educationModel: typeof Education,
+    @InjectModel(Experience)
+    private experienceModel: typeof Experience,
+    @InjectModel(Attachment)
+    private attachmentModel: typeof Attachment,
   ) {}
 
   async create(userId: string, createJobApplicationDto: CreateJobApplicationDto): Promise<JobApplication> {
@@ -77,112 +86,109 @@ export class JobApplicationService {
   /**
    * Find all job applications with filtering
    */
-  async findAll(filterDto: FilterJobApplicationDto, userId: string, isAdmin: boolean): Promise<JobApplication[]> {
+  async findAll(
+    filterDto: FilterJobApplicationDto,
+    userId?: string,
+    isAdmin = false
+  ): Promise<JobApplication[]> {
     const where: any = {};
-    const include: any[] = [];
     
-    // Add job include with optional company filter
-    const jobInclude: any = {
-      model: this.jobModel,
-      attributes: ['id', 'title', 'jobTitle', 'userId']
-    };
-    
-    // Include resume but only select id field to avoid issues
-    const resumeInclude: any = {
-      model: this.resumeModel,
-      attributes: ['id']
-    };
-    
-    // Add applicant include
-    const applicantInclude: any = {
-      model: this.userModel,
-      as: 'applicant',
-      attributes: ['id', 'firstName', 'lastName', 'email']
-    };
-    
-    // Filter by job ID
+    // Apply job ID filter
     if (filterDto.jobId) {
       where.jobId = filterDto.jobId;
     }
     
-    // Filter by applicant ID
+    // Apply job IDs filter (for company filtering)
+    if (filterDto.jobIds && filterDto.jobIds.length > 0) {
+      where.jobId = {
+        [Op.in]: filterDto.jobIds
+      };
+    }
+    
+    // Apply applicant ID filter
     if (filterDto.applicantId) {
       where.applicantId = filterDto.applicantId;
     }
     
-    // Filter by status
+    // Apply status filter
     if (filterDto.status) {
       where.status = filterDto.status;
     }
     
-    // Filter by user type
-    if (filterDto.filter) {
-      // If employer filter, show applications for employer's jobs
-      if (filterDto.filter === 'employer' && (!isAdmin && userId)) {
-        // Get all jobs by this employer
-        const employerJobs = await this.jobModel.findAll({
-          where: { userId },
-          attributes: ['id']
-        });
+    // Apply user-specific filters
+    if (userId) {
+      // If not admin, restrict to user's applications
+      if (!isAdmin) {
+        // Get user type
+        const user = await this.userModel.findByPk(userId);
         
-        if (employerJobs.length > 0) {
-          where.jobId = {
-            [Op.in]: employerJobs.map(job => job.id)
-          };
-        } else {
-          // If employer has no jobs, return empty array
-          return [];
+        if (!user) {
+          throw new NotFoundException('User not found');
         }
-      }
-      
-      // If candidate filter, show only candidate's applications
-      if (filterDto.filter === 'candidate') {
-        where.applicantId = userId;
-      }
-    } else {
-      // Default behavior if no filter specified
-      if (!isAdmin && userId) {
-        // Check if user is an employer
-        const isEmployer = await this.isEmployer(userId);
         
-        if (isEmployer) {
-          // Get all jobs by this employer
-          const employerJobs = await this.jobModel.findAll({
+        // For employers, show applications for their jobs
+        if (user.userType === UserType.EMPLOYER) {
+          // Get all jobs created by this employer
+          const jobs = await this.jobModel.findAll({
             where: { userId },
             attributes: ['id']
           });
           
-          if (employerJobs.length > 0) {
-            where.jobId = {
-              [Op.in]: employerJobs.map(job => job.id)
-            };
-          } else {
-            // If employer has no jobs, return empty array
-            return [];
+          const jobIds = jobs.map(job => job.id);
+          
+          if (jobIds.length === 0) {
+            return []; // No jobs, so no applications
           }
-        } else {
-          // If not an employer, assume candidate and show only their applications
+          
+          where.jobId = {
+            [Op.in]: jobIds
+          };
+        } 
+        // For candidates, show only their applications
+        else if (user.userType === UserType.CANDIDATE) {
           where.applicantId = userId;
         }
       }
     }
     
-    // Add includes
-    include.push(jobInclude);
-    include.push(resumeInclude);
-    include.push(applicantInclude);
+    // Set up pagination
+    const limit = filterDto.limit || 10;
+    const offset = filterDto.offset || 0;
     
-    // Pagination
-    const limit = filterDto.limit || 20;
-    const offset = ((filterDto.page || 1) - 1) * limit;
+    // Set up sorting
+    const order: any = [
+      [filterDto.sortBy || 'createdAt', filterDto.sortOrder || 'DESC']
+    ];
     
-    // Execute query
+    // Find applications with includes
     return this.jobApplicationModel.findAll({
       where,
-      include,
       limit,
       offset,
-      order: [['createdAt', 'DESC']]
+      order,
+      include: [
+        {
+          model: this.userModel,
+          as: 'applicant',
+          attributes: ['id', 'firstName', 'lastName', 'email']
+        },
+        {
+          model: this.jobModel,
+          as: 'job',
+          attributes: ['id', 'title', 'jobTitle', 'companyId', 'userId'],
+          include: [
+            {
+              model: this.userModel,
+              as: 'user',
+              attributes: ['id', 'firstName', 'lastName', 'email', 'companyName']
+            }
+          ]
+        },
+        {
+          model: this.resumeModel,
+          attributes: ['id'] // Only include the ID of the resume
+        }
+      ]
     });
   }
 
@@ -190,8 +196,27 @@ export class JobApplicationService {
     const jobApplication = await this.jobApplicationModel.findByPk(id, {
       include: [
         { 
-          model: this.resumeModel, 
-          attributes: ['id'] // Only select id to avoid issues
+          model: this.resumeModel,
+          attributes: [
+            'id', 'firstName', 'lastName', 'email', 'phone',
+            'dob', 'gender', 'nationality', 'city', 'country',
+            'offeredSalary', 'yearsOfExperience', 'qualification',
+            'professionalSkills', 'cvUrl', 'videoUrl'
+          ],
+          include: [
+            {
+              model: this.educationModel,
+              as: 'education'
+            },
+            {
+              model: this.experienceModel,
+              as: 'experiences'
+            },
+            {
+              model: this.attachmentModel,
+              as: 'attachments'
+            }
+          ]
         },
         { 
           model: this.userModel, 
@@ -445,5 +470,52 @@ export class JobApplicationService {
     // Update the status
     await jobApplication.update({ status });
     return jobApplication;
+  }
+
+  /**
+   * Add admin notes to a job application
+   */
+  async addAdminNotes(id: string, notes: string, adminId: string): Promise<JobApplication> {
+    const jobApplication = await this.findOne(id, adminId, true);
+    
+    if (!jobApplication) {
+      throw new NotFoundException('Job application not found');
+    }
+    
+    // Update the notes
+    await jobApplication.update({ 
+      adminNotes: notes,
+      updatedAt: new Date()
+    });
+    
+    return jobApplication;
+  }
+
+  /**
+   * Count job applications with filtering
+   */
+  async count(filterDto: FilterJobApplicationDto): Promise<number> {
+    const where: any = {};
+    
+    // Apply the same filters as in findAll
+    if (filterDto.jobId) {
+      where.jobId = filterDto.jobId;
+    }
+    
+    if (filterDto.jobIds && filterDto.jobIds.length > 0) {
+      where.jobId = {
+        [Op.in]: filterDto.jobIds
+      };
+    }
+    
+    if (filterDto.applicantId) {
+      where.applicantId = filterDto.applicantId;
+    }
+    
+    if (filterDto.status) {
+      where.status = filterDto.status;
+    }
+    
+    return this.jobApplicationModel.count({ where });
   }
 } 

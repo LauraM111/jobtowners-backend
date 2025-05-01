@@ -11,10 +11,21 @@ import { User } from '../user/entities/user.entity';
 import { Resume } from '../resume/entities/resume.entity';
 import { Job } from '../job/entities/job.entity';
 import { CandidatePaymentModule } from '../candidate-payment/candidate-payment.module';
+import { Education } from '../resume/entities/education.entity';
+import { Experience } from '../resume/entities/experience.entity';
+import { Attachment } from '../resume/entities/attachment.entity';
 
 @Module({
   imports: [
-    SequelizeModule.forFeature([JobApplication, User, Resume, Job]),
+    SequelizeModule.forFeature([
+      JobApplication, 
+      User, 
+      Resume, 
+      Job,
+      Education,
+      Experience,
+      Attachment
+    ]),
     JobModule,
     ResumeModule,
     UserModule,

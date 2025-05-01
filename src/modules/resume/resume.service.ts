@@ -13,6 +13,17 @@ import { User } from '../user/entities/user.entity';
 import { CreateAttachmentDto } from './dto/create-attachment.dto';
 import { CreateEducationDto } from './dto/create-education.dto';
 import { CreateExperienceDto } from './dto/create-experience.dto';
+import { QueryTypes } from 'sequelize';
+
+// Define an interface for the raw resume result
+interface RawResumeResult {
+  id: string;
+  firstName: string;
+  lastName: string;
+  email: string;
+  // Add other fields as needed
+  [key: string]: any; // Allow any other properties
+}
 
 @Injectable()
 export class ResumeService {
@@ -26,6 +37,8 @@ export class ResumeService {
     @InjectModel(Attachment)
     private attachmentModel: typeof Attachment,
     private sequelize: Sequelize,
+    @InjectModel(User)
+    private userModel: typeof User,
   ) {}
 
   /**
@@ -161,17 +174,118 @@ export class ResumeService {
   async findByUserId(userId: string): Promise<Resume> {
     console.log(`Finding resume by user ID: ${userId}`);
     
-    const resume = await this.resumeModel.findOne({
-      where: { userId },
-      include: [
-        { model: Education },
-        { model: Experience },
-        { model: Attachment }
-      ]
-    });
+    try {
+      // First, try to find the resume without includes to see if it exists
+      const resumeExists = await this.resumeModel.findOne({
+        where: { userId },
+        attributes: ['id']
+      });
+      
+      console.log(`Resume exists check: ${resumeExists ? 'Yes, ID: ' + resumeExists.id : 'No'}`);
+      
+      if (resumeExists) {
+        // Now fetch with all the includes
+        const resume = await this.resumeModel.findOne({
+          where: { userId },
+          include: [
+            { 
+              model: this.educationModel, 
+              as: 'education',
+              required: false
+            },
+            { 
+              model: this.experienceModel, 
+              as: 'experiences',
+              required: false
+            },
+            { 
+              model: this.attachmentModel, 
+              as: 'attachments',
+              required: false
+            }
+          ]
+        });
+        
+        console.log(`Resume with includes: ${resume ? 'Found' : 'Not found'}`);
+        console.log(`Resume data: ${JSON.stringify(resume, null, 2)}`);
+        
+        return resume;
+      } else {
+        console.log('No resume found for this user ID');
+        return null;
+      }
+    } catch (error) {
+      console.error('Error in findByUserId:', error);
+      return null;
+    }
+  }
 
-    // Don't throw an error if not found, just return null
-    return resume;
+  /**
+   * Find a resume by user ID with direct SQL query for debugging
+   */
+  async findByUserIdWithRawQuery(userId: string): Promise<any> {
+    console.log(`Finding resume with raw query for user ID: ${userId}`);
+    
+    try {
+      // Direct query to get the resume
+      const [resumeResults] = await this.sequelize.query(
+        `SELECT * FROM resumes WHERE userId = ?`,
+        {
+          replacements: [userId],
+          type: QueryTypes.SELECT
+        }
+      ) as [RawResumeResult, unknown];
+      
+      console.log(`Raw resume query result:`, resumeResults);
+      
+      if (resumeResults) {
+        // Get education records
+        const educationResults = await this.sequelize.query(
+          `SELECT * FROM education WHERE resumeId = ?`,
+          {
+            replacements: [resumeResults.id],
+            type: QueryTypes.SELECT
+          }
+        );
+        
+        // Get experience records
+        const experienceResults = await this.sequelize.query(
+          `SELECT * FROM experiences WHERE resumeId = ?`,
+          {
+            replacements: [resumeResults.id],
+            type: QueryTypes.SELECT
+          }
+        );
+        
+        // Get attachment records
+        const attachmentResults = await this.sequelize.query(
+          `SELECT * FROM attachments WHERE resumeId = ?`,
+          {
+            replacements: [resumeResults.id],
+            type: QueryTypes.SELECT
+          }
+        );
+        
+        console.log(`Raw education query results:`, educationResults);
+        console.log(`Raw experience query results:`, experienceResults);
+        console.log(`Raw attachment query results:`, attachmentResults);
+        
+        // Construct a complete resume object
+        const completeResume = {
+          ...resumeResults,
+          education: educationResults,
+          experiences: experienceResults,
+          attachments: attachmentResults
+        };
+        
+        return completeResume;
+      }
+      
+      return null;
+    } catch (error) {
+      console.error('Error in findByUserIdWithRawQuery:', error);
+      return null;
+    }
   }
 
   /**
@@ -670,17 +784,31 @@ export class ResumeService {
    * Get all education entries for a user's resume
    */
   async getEducation(userId: string): Promise<Education[]> {
-    // Find the resume
-    const resume = await this.resumeModel.findOne({
-      where: { userId },
-      include: [{ model: Education }],
-    });
-
-    if (!resume) {
+    console.log(`Getting education for user ID: ${userId}`);
+    
+    try {
+      // First get the resume ID
+      const resume = await this.resumeModel.findOne({
+        where: { userId },
+        attributes: ['id']
+      });
+      
+      if (!resume) {
+        console.log('No resume found for this user');
+        return [];
+      }
+      
+      // Get education records
+      const education = await this.educationModel.findAll({
+        where: { resumeId: resume.id }
+      });
+      
+      console.log(`Found ${education.length} education records`);
+      return education;
+    } catch (error) {
+      console.error('Error getting education:', error);
       return [];
     }
-
-    return resume.education;
   }
 
   /**
@@ -835,17 +963,31 @@ export class ResumeService {
    * Get all work experience entries for a user's resume
    */
   async getExperience(userId: string): Promise<Experience[]> {
-    // Find the resume
-    const resume = await this.resumeModel.findOne({
-      where: { userId },
-      include: [{ model: Experience }],
-    });
-
-    if (!resume) {
+    console.log(`Getting experience for user ID: ${userId}`);
+    
+    try {
+      // First get the resume ID
+      const resume = await this.resumeModel.findOne({
+        where: { userId },
+        attributes: ['id']
+      });
+      
+      if (!resume) {
+        console.log('No resume found for this user');
+        return [];
+      }
+      
+      // Get experience records
+      const experiences = await this.experienceModel.findAll({
+        where: { resumeId: resume.id }
+      });
+      
+      console.log(`Found ${experiences.length} experience records`);
+      return experiences;
+    } catch (error) {
+      console.error('Error getting experience:', error);
       return [];
     }
-
-    return resume.experiences;
   }
 
   /**
@@ -940,5 +1082,37 @@ export class ResumeService {
       await transaction.rollback();
       throw error;
     }
+  }
+
+  /**
+   * Create a default resume for a user if one doesn't exist
+   */
+  async createDefaultResumeIfNotExists(userId: string): Promise<Resume> {
+    // First check if a resume already exists
+    let resume = await this.findByUserId(userId);
+    
+    if (resume) {
+      return resume;
+    }
+    
+    // Get user data to populate the resume
+    const user = await this.userModel.findByPk(userId);
+    
+    if (!user) {
+      throw new NotFoundException('User not found');
+    }
+    
+    // Create a basic resume with user information
+    resume = await this.resumeModel.create({
+      userId: user.id,
+      firstName: user.firstName,
+      lastName: user.lastName,
+      email: user.email,
+      // Add other default fields as needed
+    });
+    
+    console.log(`Created default resume with ID: ${resume.id} for user: ${userId}`);
+    
+    return resume;
   }
 } 

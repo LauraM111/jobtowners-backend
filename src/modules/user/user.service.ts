@@ -441,4 +441,22 @@ export class UserService {
     
     return this.findOne(id);
   }
+
+  /**
+   * Get all companies owned by an employer
+   */
+  async getEmployerCompanies(employerId: string): Promise<any[]> {
+    const user = await this.userModel.findByPk(employerId);
+    
+    if (!user) {
+      throw new NotFoundException('User not found');
+    }
+    
+    if (user.userType !== 'employer') {
+      throw new BadRequestException('User is not an employer');
+    }
+    
+    // This assumes you have a CompanyService injected
+    return this.companyService.findByUserId(employerId, {});
+  }
 } 

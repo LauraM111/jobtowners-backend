@@ -5,20 +5,23 @@ import { UpdateJobApplicationDto } from './dto/update-job-application.dto';
 import { FilterJobApplicationDto } from './dto/filter-job-application.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
-import { Roles, UserType } from '../auth/decorators/roles.decorator';
+import { Roles } from '../auth/decorators/roles.decorator';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { JobApplication } from './entities/job-application.entity';
-import { ApiOperation, ApiResponse, ApiBearerAuth, ApiBody } from '@nestjs/swagger';
+import { ApiOperation, ApiResponse, ApiBearerAuth, ApiBody, ApiQuery } from '@nestjs/swagger';
 import { successResponse } from '../../utils/response-utils';
 import { CandidatePaymentService } from '../candidate-payment/candidate-payment.service';
 import { JobApplicationStatus } from './entities/job-application.entity';
 import { UpdateStatusDto } from './dto/update-status.dto';
+import { JobService } from '../job/job.service';
+import { UserType } from '../user/entities/user.entity';
 
 @Controller('job-applications')
 export class JobApplicationController {
   constructor(
     private readonly jobApplicationService: JobApplicationService,
     private readonly candidatePaymentService: CandidatePaymentService,
+    private readonly jobService: JobService,
   ) {}
 
   @Get('employer-applicants')
@@ -77,7 +80,7 @@ export class JobApplicationController {
   }
 
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles('employer' as UserType, 'admin' as UserType)
+  @Roles('employer')
   @Post(':id/view-resume')
   viewResume(
     @Param('id') id: string,
@@ -87,7 +90,7 @@ export class JobApplicationController {
   }
 
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles('admin' as UserType)
+  @Roles('admin')
   @Patch(':id/admin-action')
   adminAction(
     @Param('id') id: string,
@@ -171,6 +174,130 @@ export class JobApplicationController {
       return successResponse(application, 'Application status updated successfully');
     } catch (error) {
       console.error('Error updating status:', error.message);
+      throw new BadRequestException(error.message);
+    }
+  }
+
+  @Get('admin/manage')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('admin')
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Admin endpoint to manage all job applications' })
+  @ApiResponse({ status: 200, description: 'Applications retrieved successfully' })
+  @ApiQuery({ name: 'status', required: false, enum: JobApplicationStatus })
+  @ApiQuery({ name: 'jobId', required: false })
+  @ApiQuery({ name: 'applicantId', required: false })
+  @ApiQuery({ name: 'companyId', required: false })
+  @ApiQuery({ name: 'limit', required: false, type: Number })
+  @ApiQuery({ name: 'offset', required: false, type: Number })
+  @ApiQuery({ name: 'sortBy', required: false })
+  @ApiQuery({ name: 'sortOrder', required: false, enum: ['ASC', 'DESC'] })
+  async adminManageApplications(
+    @Request() req,
+    @Query() query: {
+      status?: JobApplicationStatus;
+      jobId?: string;
+      applicantId?: string;
+      companyId?: string;
+      limit?: number;
+      offset?: number;
+      sortBy?: string;
+      sortOrder?: 'ASC' | 'DESC';
+    }
+  ) {
+    try {
+      // Create a filter DTO from the query parameters
+      const filterDto: FilterJobApplicationDto = {
+        status: query.status,
+        jobId: query.jobId,
+        applicantId: query.applicantId,
+        limit: query.limit ? parseInt(query.limit.toString()) : 10,
+        offset: query.offset ? parseInt(query.offset.toString()) : 0,
+        sortBy: query.sortBy || 'createdAt',
+        sortOrder: query.sortOrder || 'DESC',
+      };
+
+      // Add company filter if provided
+      if (query.companyId) {
+        // Get all jobs from this company
+        const jobs = await this.jobService.findAll({
+          companyId: query.companyId
+        });
+        
+        // Extract job IDs
+        const jobIds = jobs.jobs.map(job => job.id);
+        
+        // Add to filter
+        filterDto.jobIds = jobIds;
+      }
+
+      // Get applications with admin privileges (isAdmin = true)
+      const applications = await this.jobApplicationService.findAll(
+        filterDto,
+        req.user.sub,
+        true
+      );
+
+      // Get total count for pagination
+      const total = await this.jobApplicationService.count(filterDto);
+
+      return successResponse(
+        { applications, total },
+        'Applications retrieved successfully'
+      );
+    } catch (error) {
+      console.error('Error retrieving applications:', error);
+      throw new BadRequestException(error.message);
+    }
+  }
+
+  @Patch('admin/update-status/:id')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('admin')
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Admin endpoint to update application status' })
+  @ApiResponse({ status: 200, description: 'Application status updated successfully' })
+  async adminUpdateStatus(
+    @Param('id') id: string,
+    @Body() updateStatusDto: UpdateStatusDto,
+    @Request() req
+  ) {
+    try {
+      const application = await this.jobApplicationService.updateStatus(
+        id,
+        updateStatusDto.status,
+        req.user.sub,
+        true // isAdmin = true
+      );
+      
+      return successResponse(application, 'Application status updated successfully');
+    } catch (error) {
+      console.error('Error updating application status:', error);
+      throw new BadRequestException(error.message);
+    }
+  }
+
+  @Post('admin/add-notes/:id')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('admin')
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Admin endpoint to add notes to an application' })
+  @ApiResponse({ status: 200, description: 'Notes added successfully' })
+  async adminAddNotes(
+    @Param('id') id: string,
+    @Body('notes') notes: string,
+    @Request() req
+  ) {
+    try {
+      const application = await this.jobApplicationService.addAdminNotes(
+        id,
+        notes,
+        req.user.sub
+      );
+      
+      return successResponse(application, 'Notes added successfully');
+    } catch (error) {
+      console.error('Error adding notes:', error);
       throw new BadRequestException(error.message);
     }
   }

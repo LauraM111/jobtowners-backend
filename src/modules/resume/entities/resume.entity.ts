@@ -157,12 +157,6 @@ export class Resume extends Model<Resume> {
   })
   cvUrl: string;
 
-  @Column({
-    type: DataType.STRING,
-    allowNull: true
-  })
-  title: string;
-
   // Relations
   @ForeignKey(() => User)
   @Column({
@@ -174,13 +168,13 @@ export class Resume extends Model<Resume> {
   @BelongsTo(() => User)
   user: User;
 
-  @HasMany(() => Education)
+  @HasMany(() => Education, 'resumeId')
   education: Education[];
 
-  @HasMany(() => Experience)
+  @HasMany(() => Experience, 'resumeId')
   experiences: Experience[];
 
-  @HasMany(() => Attachment)
+  @HasMany(() => Attachment, 'resumeId')
   attachments: Attachment[];
 
   @BeforeCreate

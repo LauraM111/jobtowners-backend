@@ -6,6 +6,7 @@ import { SubscriptionPlan } from './entities/subscription-plan.entity';
 import { User } from '../user/entities/user.entity';
 import { StripeService } from './stripe.service';
 import { CreateSubscriptionDto } from './dto/create-subscription.dto';
+import { Op } from 'sequelize';
 
 @Injectable()
 export class SubscriptionService {
@@ -364,5 +365,43 @@ export class SubscriptionService {
       this.logger.error(`Error attaching payment method: ${error.message}`);
       throw error;
     }
+  }
+
+  /**
+   * Find active subscriptions by user ID
+   */
+  async findActiveSubscriptionsByUserId(userId: string): Promise<Subscription[]> {
+    return this.subscriptionModel.findAll({
+      where: {
+        userId,
+        status: 'active',
+        endDate: {
+          [Op.gt]: new Date()
+        }
+      },
+      include: [
+        {
+          model: this.subscriptionPlanModel,
+          as: 'plan'
+        }
+      ],
+      order: [['createdAt', 'DESC']]
+    });
+  }
+
+  /**
+   * Find all subscriptions by user ID (for admin)
+   */
+  async findAllSubscriptionsByUserId(userId: string): Promise<Subscription[]> {
+    return this.subscriptionModel.findAll({
+      where: { userId },
+      include: [
+        {
+          model: this.subscriptionPlanModel,
+          as: 'plan'
+        }
+      ],
+      order: [['createdAt', 'DESC']]
+    });
   }
 } 

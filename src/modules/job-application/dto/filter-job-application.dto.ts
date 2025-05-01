@@ -1,41 +1,45 @@
-import { IsOptional, IsString, IsEnum, IsInt, Min, Max } from 'class-validator';
-import { Type } from 'class-transformer';
+import { IsOptional, IsString, IsEnum, IsArray, IsNumber } from 'class-validator';
 import { ApiProperty } from '@nestjs/swagger';
+import { JobApplicationStatus } from '../entities/job-application.entity';
 
 export class FilterJobApplicationDto {
-  @ApiProperty({ required: false, description: 'Filter by status' })
+  @ApiProperty({ required: false })
   @IsOptional()
   @IsString()
-  status?: string;
+  status?: JobApplicationStatus;
 
-  @ApiProperty({ required: false, description: 'Filter by job ID' })
+  @ApiProperty({ required: false })
   @IsOptional()
   @IsString()
   jobId?: string;
 
-  @ApiProperty({ required: false, description: 'Filter by applicant ID' })
+  @ApiProperty({ required: false })
+  @IsOptional()
+  @IsArray()
+  jobIds?: string[];
+
+  @ApiProperty({ required: false })
   @IsOptional()
   @IsString()
   applicantId?: string;
 
-  @ApiProperty({ required: false, enum: ['employer', 'candidate', 'admin'], description: 'Filter by user type' })
+  @ApiProperty({ required: false })
+  @IsOptional()
+  @IsNumber()
+  limit?: number;
+
+  @ApiProperty({ required: false })
+  @IsOptional()
+  @IsNumber()
+  offset?: number;
+
+  @ApiProperty({ required: false })
   @IsOptional()
   @IsString()
-  @IsEnum(['employer', 'candidate', 'admin'], { message: 'filter must be one of: employer, candidate, admin' })
-  filter?: string;
+  sortBy?: string;
 
-  @ApiProperty({ required: false, type: Number, description: 'Page number' })
+  @ApiProperty({ required: false })
   @IsOptional()
-  @Type(() => Number)
-  @IsInt({ message: 'page must be an integer' })
-  @Min(1, { message: 'page must be at least 1' })
-  page?: number = 1;
-
-  @ApiProperty({ required: false, type: Number, description: 'Number of items per page' })
-  @IsOptional()
-  @Type(() => Number)
-  @IsInt({ message: 'limit must be an integer' })
-  @Min(1, { message: 'limit must be at least 1' })
-  @Max(100, { message: 'limit must not exceed 100' })
-  limit?: number = 20;
+  @IsString()
+  sortOrder?: 'ASC' | 'DESC';
 } 
