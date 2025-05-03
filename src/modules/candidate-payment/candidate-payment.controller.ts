@@ -37,7 +37,7 @@ export class CandidatePaymentController {
     private configService: ConfigService
   ) {
     this.stripe = new Stripe(this.configService.get<string>('STRIPE_SECRET_KEY'), {
-      apiVersion: '2024-06-20',
+      apiVersion: '2025-04-30.basil',
     });
   }
 
