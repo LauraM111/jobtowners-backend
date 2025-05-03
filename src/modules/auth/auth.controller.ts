@@ -1,4 +1,4 @@
-import { Controller, Post, Body, UseGuards, Get, Param, Query, Request, UnauthorizedException, BadRequestException, HttpCode, HttpStatus } from '@nestjs/common';
+import { Controller, Post, Body, UseGuards, Get, Param, Query, Request, UnauthorizedException, BadRequestException, HttpCode, HttpStatus, NotFoundException } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
 import { AuthService } from './auth.service';
 import { LocalAuthGuard } from './guards/local-auth.guard';
@@ -25,43 +25,24 @@ export class AuthController {
   @Public()
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Login with email and password' })
-  @ApiResponse({ 
-    status: 200, 
-    description: 'Login successful',
-    schema: {
-      properties: {
-        success: { type: 'boolean' },
-        message: { type: 'string' },
-        data: {
-          type: 'object',
-          properties: {
-            access_token: { type: 'string' },
-            user: {
-              type: 'object',
-              properties: {
-                id: { type: 'number' },
-                email: { type: 'string' },
-                firstName: { type: 'string' },
-                lastName: { type: 'string' },
-                phoneNumber: { type: 'string' },
-                userType: { type: 'string' },
-                role: { type: 'string' },
-                status: { type: 'string' },
-                isEmailVerified: { type: 'boolean' },
-                isActive: { type: 'boolean' },
-                companyName: { type: 'string' },
-                // Add other user properties here
-              }
-            }
-          }
-        }
-      }
-    }
-  })
-  @ApiResponse({ status: 401, description: 'Unauthorized - Invalid credentials' })
+  @ApiResponse({ status: 200, description: 'Login successful' })
+  @ApiResponse({ status: 401, description: 'Unauthorized - Invalid credentials or email not verified' })
   @UseGuards(LocalAuthGuard)
   async login(@Request() req, @Body() loginDto: LoginDto) {
-    return this.authService.login(req.user);
+    try {
+      return this.authService.login(req.user);
+    } catch (error) {
+      if (error instanceof UnauthorizedException && 
+          error.message === `Please verify your email before logging in ${process.env.FRONTEND_URL}/resend-verification`) {
+        throw new UnauthorizedException({
+          success: false, 
+          message: 'Please verify your email before logging in',
+          emailVerificationRequired: true,
+          verificationUrl: `${process.env.FRONTEND_URL}/resend-verification`
+        });
+      }
+      throw error;
+    }
   }
 
   @Public()
@@ -71,17 +52,47 @@ export class AuthController {
   async verifyEmail(@Query('token') token: string) {
     try {
       await this.authService.verifyEmail(token);
-      // Redirect to frontend success page or return success message
-      return { message: 'Email verified successfully' };
+      
+      // Return a more detailed success response
+      return { 
+        success: true,
+        message: 'Email verified successfully',
+        data: {
+          verified: true,
+          loginUrl: `${process.env.FRONTEND_URL}/login`
+        }
+      };
     } catch (error) {
-      // Instead of letting the exception filter handle it with a generic message,
-      // provide more specific error information
+      console.error('Email verification error:', error);
+      
+      // Provide more specific error information
       if (error.message === 'Token expired') {
-        throw new BadRequestException('Email verification token has expired. Please request a new one.');
+        throw new BadRequestException({
+          success: false,
+          message: 'Email verification token has expired. Please request a new one.',
+          data: {
+            expired: true,
+            resendUrl: `${process.env.FRONTEND_URL}/resend-verification`
+          }
+        });
       } else if (error.message === 'Token already used') {
-        throw new BadRequestException('This verification link has already been used.');
+        throw new BadRequestException({
+          success: false,
+          message: 'This verification link has already been used.',
+          data: {
+            alreadyUsed: true,
+            loginUrl: `${process.env.FRONTEND_URL}/login`
+          }
+        });
       } else {
-        throw new BadRequestException('Invalid or expired verification token. Please request a new one.');
+        throw new BadRequestException({
+          success: false,
+          message: 'Invalid or expired verification token. Please request a new one.',
+          data: {
+            invalid: true,
+            resendUrl: `${process.env.FRONTEND_URL}/resend-verification`
+          }
+        });
       }
     }
   }
@@ -90,9 +101,21 @@ export class AuthController {
   @Post('resend-verification')
   @ApiOperation({ summary: 'Resend verification email' })
   @ApiResponse({ status: 200, description: 'Verification email sent' })
+  @ApiResponse({ status: 404, description: 'User not found' })
   async resendVerification(@Body('email') email: string) {
-    await this.tokenService.resendVerificationByEmail(email);
-    return successResponse(null, 'Verification email sent');
+    try {
+      await this.tokenService.resendVerificationByEmail(email);
+      return successResponse(null, 'Verification email sent. Please check your inbox.');
+    } catch (error) {
+      if (error instanceof NotFoundException) {
+        throw new NotFoundException('User not found');
+      }
+      if (error instanceof BadRequestException) {
+        // If email is already verified
+        throw error;
+      }
+      throw new BadRequestException('Failed to send verification email');
+    }
   }
 
   @Public()

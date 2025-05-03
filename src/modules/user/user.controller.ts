@@ -21,6 +21,8 @@ import {
   UseInterceptors,
   UploadedFile,
   DefaultValuePipe,
+  UsePipes,
+  ValidationPipe,
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiParam, ApiBearerAuth } from '@nestjs/swagger';
 import { UserService } from './user.service';
@@ -143,6 +145,7 @@ export class UserController {
   @ApiOperation({ summary: 'Register a new candidate user' })
   @ApiResponse({ status: 201, description: 'User registered successfully' })
   @ApiResponse({ status: 400, description: 'Bad request' })
+  @UsePipes(new ValidationPipe({ whitelist: true, transform: true }))
   async registerCandidate(@Body() registrationDto: CandidateRegistrationDto) {
     try {
       const user = await this.userService.registerCandidate(registrationDto);
@@ -183,6 +186,7 @@ export class UserController {
   })
   @ApiResponse({ status: 400, description: 'Bad request.' })
   @ApiResponse({ status: 409, description: 'User with this email already exists.' })
+  @UsePipes(new ValidationPipe({ whitelist: true, transform: true }))
   async registerEmployer(@Body() registrationDto: EmployerRegistrationDto) {
     try {
       const user = await this.userService.registerEmployer(registrationDto);

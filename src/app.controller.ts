@@ -7,7 +7,7 @@ import { successResponse } from './common/helpers/response.helper';
 @Controller()
 export class AppController {
   @Public()
-  @Get()
+  @Get('health')
   @ApiOperation({ summary: 'Health check endpoint' })
   @ApiResponse({ status: 200, description: 'Application is running' })
   healthCheck() {

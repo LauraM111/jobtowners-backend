@@ -82,20 +82,31 @@ export class UserService {
       let enrollmentProofUrl = '';
       
       try {
-        studentPermitUrl = await this.uploadService.uploadBase64File(
-          registrationDto.studentPermitImage,
-          'documents',
-          'jpg'
-        );
+        // Check if the image is already a URL
+        if (registrationDto.studentPermitImage.startsWith('http')) {
+          studentPermitUrl = registrationDto.studentPermitImage;
+        } else {
+          // Try to upload as base64
+          studentPermitUrl = await this.uploadService.uploadBase64File(
+            registrationDto.studentPermitImage,
+            'documents',
+            'jpg'
+          );
+        }
         
-        enrollmentProofUrl = await this.uploadService.uploadBase64File(
-          registrationDto.proofOfEnrollmentImage,
-          'documents',
-          'jpg'
-        );
+        if (registrationDto.proofOfEnrollmentImage.startsWith('http')) {
+          enrollmentProofUrl = registrationDto.proofOfEnrollmentImage;
+        } else {
+          // Try to upload as base64
+          enrollmentProofUrl = await this.uploadService.uploadBase64File(
+            registrationDto.proofOfEnrollmentImage,
+            'documents',
+            'jpg'
+          );
+        }
       } catch (error) {
         this.logger.error(`Error uploading images: ${error.message}`, error.stack);
-        throw new BadRequestException('Failed to upload images');
+        throw new BadRequestException('Failed to upload images: ' + error.message);
       }
 
       // Create new user
@@ -110,7 +121,7 @@ export class UserService {
         studentPermitImage: studentPermitUrl,
         proofOfEnrollmentImage: enrollmentProofUrl,
         termsAccepted: registrationDto.termsAccepted,
-        emailVerified: false, // Set email as unverified initially
+        isEmailVerified: false, // Set email as unverified initially
       });
 
       // Send welcome email - don't await, just fire and forget
@@ -135,7 +146,7 @@ export class UserService {
       
       // Handle other errors
       this.logger.error(`Error registering candidate: ${error.message}`, error.stack);
-      throw new BadRequestException('Failed to register candidate');
+      throw new BadRequestException('Failed to register candidate: ' + error.message);
     }
   }
 
@@ -292,11 +303,17 @@ export class UserService {
   /**
    * Update a user
    */
-  async update(id: string, updateUserDto: UpdateUserDto): Promise<User> {
-    const user = await this.findOne(id);
+  async update(id: string, updateData: Partial<User>): Promise<User> {
+    const user = await this.findById(id);
     
-    await user.update(updateUserDto);
-    return user;
+    if (!user) {
+      throw new NotFoundException('User not found');
+    }
+    
+    // Update user with provided fields
+    await user.update(updateData);
+    
+    return this.findById(id);
   }
 
   /**

@@ -68,12 +68,12 @@ async function bootstrap() {
     // Use Helmet for security headers
     app.use(helmet());
   
-    // Apply validation pipe
+    // Configure global validation pipe to strip unknown properties
     app.useGlobalPipes(
       new ValidationPipe({
-        whitelist: true,
+        whitelist: true, // This will strip properties that don't have decorators
+        forbidNonWhitelisted: false, // This will allow unknown properties without throwing errors
         transform: true,
-        forbidNonWhitelisted: true,
       }),
     );
   

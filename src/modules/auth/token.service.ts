@@ -150,7 +150,11 @@ export class TokenService {
       if (error instanceof BadRequestException) {
         throw error;
       }
-      throw new NotFoundException('User not found');
+      if (error instanceof NotFoundException) {
+        throw error;
+      }
+      this.logger.error(`Error resending verification: ${error.message}`, error.stack);
+      throw new BadRequestException('Failed to resend verification email');
     }
   }
 

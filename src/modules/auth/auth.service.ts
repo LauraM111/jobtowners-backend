@@ -80,6 +80,13 @@ export class AuthService {
       const user = await this.userService.findByEmail(email);
       console.log(`User found: ${user.id}, type: ${user.userType}`);
       
+      // Check if email is verified
+      if (!user.isEmailVerified) {
+        console.log(`Email not verified for user: ${user.id}`);
+        // Instead of returning null, throw a specific error
+        throw new UnauthorizedException(`Please verify your email before logging in ${process.env.FRONTEND_URL}/resend-verification`);
+      }
+      
       // Use direct bcrypt comparison for maximum reliability
       const isPasswordValid = await bcrypt.compare(password, user.password);
       console.log(`Password valid: ${isPasswordValid}`);
@@ -92,6 +99,10 @@ export class AuthService {
       return null;
     } catch (error) {
       console.error(`Error validating user: ${error.message}`);
+      // Re-throw UnauthorizedException with our custom message
+      if (error instanceof UnauthorizedException) {
+        throw error;
+      }
       return null;
     }
   }
@@ -148,9 +159,24 @@ export class AuthService {
     await this.tokenService.update(tokenRecord.id, { used: true });
 
     // Update user's email verification status
-    await this.userService.update(String(tokenRecord.userId), { 
-      emailVerified: true,
-      emailVerifiedAt: new Date()
-    });
+    const user = await this.userService.findById(tokenRecord.userId);
+    if (!user) {
+      throw new Error('User not found');
+    }
+
+    // Update user status to ACTIVE if it was INACTIVE
+    let updateData: any = { 
+      isEmailVerified: true 
+    };
+    
+    // If user status is INACTIVE, change it to ACTIVE
+    if (user.status === 'inactive') {
+      updateData.status = 'active';
+    }
+    
+    // Update the user record
+    await this.userService.update(tokenRecord.userId, updateData);
+    
+    console.log(`User ${tokenRecord.userId} email verified and status updated to active`);
   }
 } 

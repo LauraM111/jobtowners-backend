@@ -1,5 +1,5 @@
-import { ApiProperty } from '@nestjs/swagger';
-import { IsEmail, IsNotEmpty, IsString, MinLength, IsBoolean } from 'class-validator';
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { IsEmail, IsNotEmpty, IsString, MinLength, IsBoolean, IsOptional } from 'class-validator';
 
 export class EmployerRegistrationDto {
   @ApiProperty({ example: 'John', description: 'First name' })
@@ -32,4 +32,14 @@ export class EmployerRegistrationDto {
   @IsNotEmpty()
   @IsBoolean()
   termsAccepted: boolean;
+
+  @ApiPropertyOptional({ example: 'johndoe', description: 'Username (not used)' })
+  @IsString()
+  @IsOptional()
+  username?: string;
+  
+  @ApiPropertyOptional({ example: 'employer', description: 'User type (determined by endpoint)' })
+  @IsString()
+  @IsOptional()
+  userType?: string;
 } 
