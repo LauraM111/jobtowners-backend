@@ -33,6 +33,7 @@ async function bootstrap() {
       console.error('Error initializing database:', error.message);
       // Continue anyway, as the app might still work with an existing database
     }
+    
 
     const app = await NestFactory.create<NestExpressApplication>(AppModule, {
       bodyParser: false, // Disable the built-in body parser

@@ -24,18 +24,13 @@ export class JwtAuthGuard extends AuthGuard('jwt') {
     return super.canActivate(context);
   }
 
-  handleRequest(err, user, info, context) {
-    // Add detailed logging for debugging 
-    const request = context.switchToHttp().getRequest();
-    const authHeader = request.headers.authorization;
+  handleRequest(err, user, info) {
+    console.log('JWT Auth Guard - Error:', err);
+    console.log('JWT Auth Guard - User:', user);
+    console.log('JWT Auth Guard - Info:', info);
     
     if (err || !user) {
-      throw new UnauthorizedException({
-        message: 'Invalid token',
-        error: err?.message || 'JWT Auth Error',
-        info: info?.message ? `JWT Auth Info: ${info.name}: ${info.message}` : null,
-        user: !!user
-      });
+      throw err || new UnauthorizedException('Authentication required. Please login.');
     }
     return user;
   }

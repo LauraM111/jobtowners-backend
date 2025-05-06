@@ -33,7 +33,7 @@ export class AuthController {
       return this.authService.login(req.user);
     } catch (error) {
       if (error instanceof UnauthorizedException && 
-          error.message === `Please verify your email before logging in ${process.env.FRONTEND_URL}/resend-verification`) {
+          error.message === `Please verify your email before logging in <a href="${process.env.FRONTEND_URL}/resend-verification">here</a>  `) {
         throw new UnauthorizedException({
           success: false, 
           message: 'Please verify your email before logging in',

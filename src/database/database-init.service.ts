@@ -10,6 +10,7 @@ export class DatabaseInitService implements OnModuleInit {
   ) {}
 
   async onModuleInit() {
+    console.log("this.configService",this.configService);
     if (this.configService.get('NODE_ENV') === 'development') {
       console.log('Initializing database tables...');
       await this.initializeTables();
@@ -395,7 +396,7 @@ export class DatabaseInitService implements OnModuleInit {
         ) ENGINE=InnoDB CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
       `);
       
-      // Create message attachments table
+      // Create message_attachments table
       await this.sequelize.query(`
         CREATE TABLE IF NOT EXISTS message_attachments (
           id VARCHAR(36) PRIMARY KEY,
@@ -407,6 +408,70 @@ export class DatabaseInitService implements OnModuleInit {
           createdAt DATETIME NOT NULL,
           updatedAt DATETIME NOT NULL,
           CONSTRAINT fk_message_attachments_message FOREIGN KEY (messageId) REFERENCES messages(id) ON DELETE CASCADE
+        ) ENGINE=InnoDB CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+      `);
+      
+      // Create contact_submissions table
+      await this.sequelize.query(`
+        CREATE TABLE IF NOT EXISTS contact_submissions (
+          id VARCHAR(36) PRIMARY KEY,
+          name VARCHAR(255) NOT NULL,
+          email VARCHAR(255) NOT NULL,
+          phoneNumber VARCHAR(255),
+          subject VARCHAR(255) NOT NULL,
+          message TEXT NOT NULL,
+          status ENUM('new', 'read', 'responded') NOT NULL DEFAULT 'new',
+          respondedAt DATETIME,
+          respondedBy VARCHAR(36),
+          createdAt DATETIME NOT NULL,
+          updatedAt DATETIME NOT NULL,
+          CONSTRAINT fk_contact_submissions_responder FOREIGN KEY (respondedBy) REFERENCES users(id) ON DELETE SET NULL
+        ) ENGINE=InnoDB CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+      `);
+      
+      // Create community_posts table
+      await this.sequelize.query(`
+        CREATE TABLE IF NOT EXISTS community_posts (
+          id VARCHAR(36) PRIMARY KEY,
+          title VARCHAR(255) NOT NULL,
+          content TEXT NOT NULL,
+          postType ENUM('candidate', 'employer', 'general') NOT NULL,
+          authorId VARCHAR(36) NOT NULL,
+          status ENUM('active', 'pending', 'rejected', 'archived') NOT NULL DEFAULT 'active',
+          likesCount INT NOT NULL DEFAULT 0,
+          commentsCount INT NOT NULL DEFAULT 0,
+          createdAt DATETIME NOT NULL,
+          updatedAt DATETIME NOT NULL,
+          deletedAt DATETIME,
+          CONSTRAINT fk_community_posts_author FOREIGN KEY (authorId) REFERENCES users(id) ON DELETE CASCADE
+        ) ENGINE=InnoDB CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+      `);
+      
+      // Create post_comments table
+      await this.sequelize.query(`
+        CREATE TABLE IF NOT EXISTS post_comments (
+          id VARCHAR(36) PRIMARY KEY,
+          postId VARCHAR(36) NOT NULL,
+          authorId VARCHAR(36) NOT NULL,
+          content TEXT NOT NULL,
+          status ENUM('active', 'hidden', 'deleted') NOT NULL DEFAULT 'active',
+          createdAt DATETIME NOT NULL,
+          updatedAt DATETIME NOT NULL,
+          CONSTRAINT fk_post_comments_post FOREIGN KEY (postId) REFERENCES community_posts(id) ON DELETE CASCADE,
+          CONSTRAINT fk_post_comments_author FOREIGN KEY (authorId) REFERENCES users(id) ON DELETE CASCADE
+        ) ENGINE=InnoDB CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+      `);
+      
+      // Create post_likes table
+      await this.sequelize.query(`
+        CREATE TABLE IF NOT EXISTS post_likes (
+          id VARCHAR(36) PRIMARY KEY,
+          postId VARCHAR(36) NOT NULL,
+          userId VARCHAR(36) NOT NULL,
+          createdAt DATETIME NOT NULL,
+          CONSTRAINT fk_post_likes_post FOREIGN KEY (postId) REFERENCES community_posts(id) ON DELETE CASCADE,
+          CONSTRAINT fk_post_likes_user FOREIGN KEY (userId) REFERENCES users(id) ON DELETE CASCADE,
+          UNIQUE KEY unique_post_user_like (postId, userId)
         ) ENGINE=InnoDB CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
       `);
       

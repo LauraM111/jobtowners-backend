@@ -23,6 +23,8 @@ import { DatabaseInitService } from './database/database-init.service';
 import { JobApplicationModule } from './modules/job-application/job-application.module';
 import { CandidatePaymentModule } from './modules/candidate-payment/candidate-payment.module';
 import { MessagingModule } from './modules/messaging/messaging.module';
+import { ContactModule } from './modules/contact/contact.module';
+import { CommunityModule } from './modules/community/community.module';
 
 // Import entities from their correct locations
 import { User } from './modules/user/entities/user.entity';
@@ -98,6 +100,8 @@ import { ApplicationLimit } from './modules/candidate-payment/entities/applicati
     JobApplicationModule,
     CandidatePaymentModule,
     MessagingModule,
+    ContactModule,
+    CommunityModule,
   ],
   controllers: [AppController],
   providers: [
