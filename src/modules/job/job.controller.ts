@@ -20,10 +20,13 @@ import { Public } from '../auth/decorators/public.decorator';
 import { VerifyJobDto } from './dto/verify-job.dto';
 import { VerificationStatus, JobType, JobStatus } from './entities/job.entity';
 import { JwtService } from '@nestjs/jwt';
+import { Logger } from '@nestjs/common';
 
 @ApiTags('Jobs')
 @Controller('jobs')
 export class JobController {
+  private readonly logger = new Logger(JobController.name);
+
   constructor(
     private readonly jobService: JobService,
     private readonly jwtService: JwtService
@@ -445,7 +448,7 @@ export class JobController {
   @ApiQuery({ name: 'offset', required: false, type: Number })
   @ApiQuery({ name: 'search', required: false, type: String })
   async getJobsByType(
-    @Param('jobType') jobType: JobType,
+    @Param('jobType') jobType: string,
     @Query('limit') limit?: number,
     @Query('offset') offset?: number,
     @Query('search') search?: string,
@@ -464,18 +467,28 @@ export class JobController {
         }
       }
     } catch (error) {
-      console.log('Error extracting user from token:', error);
+      this.logger.error('Error extracting user from token:', error);
     }
+    
+    // Validate that the jobType is a valid enum value
+    if (!Object.values(JobType).includes(jobType as JobType)) {
+      throw new BadRequestException(`Invalid job type: ${jobType}`);
+    }
+    
+    // Log the query parameters to help with debugging
+    this.logger.log(`Searching for jobs with type: ${jobType}, limit: ${limit}, offset: ${offset}`);
     
     const { jobs, total } = await this.jobService.findAll({
       limit,
       offset,
-      jobType,
+      jobType: jobType as JobType,
       status: JobStatus.ACTIVE,
       verificationStatus: VerificationStatus.APPROVED,
       search,
       currentUserId
     });
+    
+    this.logger.log(`Found ${total} jobs of type ${jobType}`);
     
     return successResponse({ 
       jobs, 
