@@ -13,4 +13,17 @@ export class AppController {
   healthCheck() {
     return successResponse({ status: 'ok', timestamp: new Date().toISOString() }, 'Application is running');
   }
+}
+
+@Controller('*')
+export class CatchAllController {
+  @Get()
+  @Public()
+  notFound() {
+    return {
+      success: false,
+      message: 'Endpoint not found',
+      data: null
+    };
+  }
 } 

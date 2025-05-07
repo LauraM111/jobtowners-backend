@@ -111,7 +111,6 @@ export class StripeService {
       const subscriptionData: Stripe.SubscriptionCreateParams = {
         customer: customerId,
         items: [{ price: priceId }],
-        expand: ['latest_invoice.payment_intent'],
       };
 
       // Add payment method if provided
@@ -256,6 +255,23 @@ export class StripeService {
     } catch (error) {
       this.logger.error(`Error retrieving Stripe customer: ${error.message}`);
       throw error;
+    }
+  }
+
+  /**
+   * List payment methods for a customer
+   */
+  async listPaymentMethods(customerId: string): Promise<any[]> {
+    try {
+      const paymentMethods = await this.stripe.paymentMethods.list({
+        customer: customerId,
+        type: 'card'
+      });
+      
+      return paymentMethods.data;
+    } catch (error) {
+      this.logger.error(`Error listing payment methods: ${error.message}`);
+      return [];
     }
   }
 } 

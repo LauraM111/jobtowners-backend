@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException, BadRequestException, ForbiddenException } from '@nestjs/common';
+import { Injectable, NotFoundException, BadRequestException, ForbiddenException, Logger } from '@nestjs/common';
 import { InjectModel } from '@nestjs/sequelize';
 import { Sequelize } from 'sequelize-typescript';
 import { Conversation } from './entities/conversation.entity';
@@ -14,6 +14,8 @@ import { Op } from 'sequelize';
 
 @Injectable()
 export class MessagingService {
+  private readonly logger = new Logger(MessagingService.name);
+
   constructor(
     @InjectModel(Conversation)
     private conversationModel: typeof Conversation,
@@ -296,35 +298,54 @@ export class MessagingService {
    * Get unread message count for a user
    */
   async getUnreadMessageCount(userId: string): Promise<number> {
-    // Find conversations where the user is either employer or candidate
-    const conversations = await this.conversationModel.findAll({
-      where: {
-        [Op.or]: [
-          { employerId: userId },
-          { candidateId: userId }
-        ]
-      },
-      attributes: ['id']
-    });
-    
-    const conversationIds = conversations.map(c => c.id);
-    
-    if (conversationIds.length === 0) {
+    try {
+      // First, determine the user type
+      const user = await this.userModel.findByPk(userId);
+      
+      // If user doesn't exist, return 0 instead of throwing an error
+      if (!user) {
+        this.logger.warn(`User with ID ${userId} not found when getting unread message count`);
+        return 0;
+      }
+
+      // Get all conversations where this user is a participant
+      let conversationWhere: any = {};
+      
+      if (user.userType === UserType.EMPLOYER) {
+        conversationWhere.employerId = userId;
+      } else if (user.userType === UserType.CANDIDATE) {
+        conversationWhere.candidateId = userId;
+      } else {
+        // For admin or other user types, return 0
+        return 0;
+      }
+
+      const conversations = await this.conversationModel.findAll({
+        where: conversationWhere,
+        attributes: ['id']
+      });
+
+      if (conversations.length === 0) {
+        return 0;
+      }
+
+      const conversationIds = conversations.map(conv => conv.id);
+
+      // Count unread messages in these conversations that were not sent by this user
+      const count = await this.messageModel.count({
+        where: {
+          conversationId: { [Op.in]: conversationIds },
+          senderId: { [Op.ne]: userId }, // Not sent by this user
+          isRead: false
+        }
+      });
+
+      return count;
+    } catch (error) {
+      this.logger.error(`Error getting unread message count: ${error.message}`);
+      // Return 0 instead of re-throwing the error
       return 0;
     }
-    
-    // Count unread messages where the user is not the sender
-    return this.messageModel.count({
-      where: {
-        conversationId: {
-          [Op.in]: conversationIds
-        },
-        senderId: {
-          [Op.ne]: userId
-        },
-        isRead: false
-      }
-    });
   }
 
   /**

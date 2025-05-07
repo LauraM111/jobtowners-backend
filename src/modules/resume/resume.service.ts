@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
+import { Injectable, NotFoundException, BadRequestException, InternalServerErrorException, Logger } from '@nestjs/common';
 import { InjectModel } from '@nestjs/sequelize';
 import { Transaction } from 'sequelize';
 import { Sequelize } from 'sequelize-typescript';
@@ -27,6 +27,8 @@ interface RawResumeResult {
 
 @Injectable()
 export class ResumeService {
+  private readonly logger = new Logger(ResumeService.name);
+
   constructor(
     @InjectModel(Resume)
     private resumeModel: typeof Resume,
@@ -172,50 +174,39 @@ export class ResumeService {
    * Find a resume by user ID
    */
   async findByUserId(userId: string): Promise<Resume> {
-    console.log(`Finding resume by user ID: ${userId}`);
-    
     try {
-      // First, try to find the resume without includes to see if it exists
-      const resumeExists = await this.resumeModel.findOne({
+      this.logger.debug(`Finding resume for user ID: ${userId}`);
+      
+      const resume = await this.resumeModel.findOne({
         where: { userId },
-        attributes: ['id']
+        include: [
+          { 
+            model: this.educationModel, 
+            as: 'education',
+            required: false
+          },
+          { 
+            model: this.experienceModel, 
+            as: 'experiences',
+            required: false
+          },
+          { 
+            model: this.attachmentModel, 
+            as: 'attachments',
+            required: false
+          }
+        ]
       });
       
-      console.log(`Resume exists check: ${resumeExists ? 'Yes, ID: ' + resumeExists.id : 'No'}`);
-      
-      if (resumeExists) {
-        // Now fetch with all the includes
-        const resume = await this.resumeModel.findOne({
-          where: { userId },
-          include: [
-            { 
-              model: this.educationModel, 
-              as: 'education',
-              required: false
-            },
-            { 
-              model: this.experienceModel, 
-              as: 'experiences',
-              required: false
-            },
-            { 
-              model: this.attachmentModel, 
-              as: 'attachments',
-              required: false
-            }
-          ]
-        });
-        
-        console.log(`Resume with includes: ${resume ? 'Found' : 'Not found'}`);
-        console.log(`Resume data: ${JSON.stringify(resume, null, 2)}`);
-        
-        return resume;
+      if (resume) {
+        this.logger.debug(`Resume found with ID: ${resume.id}`);
       } else {
-        console.log('No resume found for this user ID');
-        return null;
+        this.logger.debug(`No resume found for user ID: ${userId}`);
       }
+      
+      return resume;
     } catch (error) {
-      console.error('Error in findByUserId:', error);
+      this.logger.error(`Error finding resume by user ID: ${error.message}`);
       return null;
     }
   }
@@ -472,36 +463,99 @@ export class ResumeService {
   }
 
   /**
-   * Update a user's personal details
+   * Update personal details for a user
    */
-  async updatePersonalDetails(userId: string, personalDetailsDto: PersonalDetailsDto): Promise<Resume> {
+  async updatePersonalDetails(userId: string, personalDetailsDto: PersonalDetailsDto): Promise<any> {
     const transaction = await this.sequelize.transaction();
     
     try {
-      // Find the resume
+      console.log(`[ResumeService] Updating personal details for user ID: ${userId}`);
+      
+      // First, check if the user exists
+      const user = await this.userModel.findByPk(userId);
+      
+      if (!user) {
+        console.error(`[ResumeService] User with ID ${userId} not found`);
+        throw new NotFoundException(`User with ID ${userId} not found`);
+      }
+      
+      console.log(`[ResumeService] User found: ${user.email}`);
+      
+      // Check if the user has a resume
       let resume = await this.resumeModel.findOne({
         where: { userId },
-        transaction,
+        transaction
       });
-
-      // If resume doesn't exist, create a new one
+      
+      // If no resume exists, create a new one
       if (!resume) {
-        resume = await this.resumeModel.create(
-          {
-            ...personalDetailsDto,
+        console.log(`[ResumeService] No resume found for user ${userId}, creating a new one`);
+        
+        try {
+          // Create a basic resume with the personal details
+          resume = await this.resumeModel.create({
             userId,
-          } as any,  // Type assertion to bypass type checking
-          { transaction }
-        );
+            ...personalDetailsDto
+          }, { transaction });
+          
+          console.log(`[ResumeService] Created new resume with ID: ${resume.id}`);
+        } catch (createError) {
+          console.error(`[ResumeService] Error creating resume:`, createError);
+          throw new InternalServerErrorException(`Failed to create resume: ${createError.message}`);
+        }
       } else {
-        // Update existing resume
-        await resume.update(personalDetailsDto, { transaction });
+        console.log(`[ResumeService] Updating existing resume with ID: ${resume.id}`);
+        
+        try {
+          // Update the existing resume with the personal details
+          await resume.update(personalDetailsDto, { transaction });
+          console.log(`[ResumeService] Resume updated successfully`);
+        } catch (updateError) {
+          console.error(`[ResumeService] Error updating resume:`, updateError);
+          throw new InternalServerErrorException(`Failed to update resume: ${updateError.message}`);
+        }
       }
-
+      
       await transaction.commit();
-      return this.findOne(userId);
+      console.log(`[ResumeService] Transaction committed successfully`);
+      
+      // Return the updated resume with includes
+      try {
+        const updatedResume = await this.resumeModel.findOne({
+          where: { userId },
+          include: [
+            { 
+              model: this.educationModel, 
+              as: 'education',
+              required: false
+            },
+            { 
+              model: this.experienceModel, 
+              as: 'experiences',
+              required: false
+            },
+            { 
+              model: this.attachmentModel, 
+              as: 'attachments',
+              required: false
+            }
+          ]
+        });
+        
+        if (!updatedResume) {
+          console.error(`[ResumeService] Updated resume not found after commit`);
+          throw new NotFoundException('Resume not found after update');
+        }
+        
+        console.log(`[ResumeService] Retrieved updated resume with ID: ${updatedResume.id}`);
+        return updatedResume;
+      } catch (findError) {
+        console.error(`[ResumeService] Error retrieving updated resume:`, findError);
+        throw new InternalServerErrorException(`Failed to retrieve updated resume: ${findError.message}`);
+      }
     } catch (error) {
       await transaction.rollback();
+      console.error(`[ResumeService] Transaction rolled back due to error:`, error);
       throw error;
     }
   }
@@ -1112,6 +1166,21 @@ export class ResumeService {
     });
     
     console.log(`Created default resume with ID: ${resume.id} for user: ${userId}`);
+    
+    return resume;
+  }
+
+  /**
+   * Update resume video URL
+   */
+  async updateVideoUrl(id: string, videoUrl: string): Promise<Resume> {
+    const resume = await this.resumeModel.findByPk(id);
+    
+    if (!resume) {
+      throw new NotFoundException('Resume not found');
+    }
+    
+    await resume.update({ videoUrl });
     
     return resume;
   }

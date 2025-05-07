@@ -1,34 +1,57 @@
 import { NestFactory } from '@nestjs/core';
 import { AppModule } from '../app.module';
 import { CandidatePaymentService } from '../modules/candidate-payment/candidate-payment.service';
+import { CreateCandidatePlanDto } from '../modules/candidate-payment/dto/create-candidate-plan.dto';
 
 async function bootstrap() {
   const app = await NestFactory.createApplicationContext(AppModule);
   
   try {
+    console.log('Starting candidate plan seeder...');
+    
     const candidatePaymentService = app.get(CandidatePaymentService);
     
-    console.log('Seeding default candidate plan...');
+    // Check if plans already exist
+    const existingPlansResult = await candidatePaymentService.findAllPlans(1, 100);
     
-    // Check if default plan already exists
-    const existingPlans = await candidatePaymentService.findAllPlans();
-    
-    if (existingPlans.length === 0) {
-      // Create default plan
-      await candidatePaymentService.createPlan({
-        name: 'Job Application Access',
-        description: 'One-time payment for unlimited job applications (15 per day)',
-        price: 15.00,
-        currency: 'usd',
-        dailyApplicationLimit: 15
-      });
+    // Access the plans array from the result
+    if (existingPlansResult.plans.length === 0) {
+      // Create default plans
+      const defaultPlans: CreateCandidatePlanDto[] = [
+        {
+          name: 'Basic Plan',
+          description: 'Apply for up to 15 jobs per day',
+          price: 9.99,
+          currency: 'usd',
+          dailyApplicationLimit: 15
+        },
+        {
+          name: 'Standard Plan',
+          description: 'Apply for up to 30 jobs per day',
+          price: 19.99,
+          currency: 'usd',
+          dailyApplicationLimit: 30
+        },
+        {
+          name: 'Premium Plan',
+          description: 'Apply for up to 50 jobs per day',
+          price: 29.99,
+          currency: 'usd',
+          dailyApplicationLimit: 50
+        }
+      ];
+
+      for (const planData of defaultPlans) {
+        await candidatePaymentService.createPlan(planData);
+        console.log(`Created plan: ${planData.name}`);
+      }
       
-      console.log('Default candidate plan created successfully');
+      console.log('Candidate plans seeded successfully');
     } else {
-      console.log('Default candidate plan already exists');
+      console.log(`Skipping candidate plan seeding. ${existingPlansResult.plans.length} plans already exist.`);
     }
   } catch (error) {
-    console.error('Error seeding default candidate plan:', error);
+    console.error('Error seeding candidate plans:', error.message);
   } finally {
     await app.close();
   }

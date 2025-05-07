@@ -1,37 +1,58 @@
-import { NestFactory } from '@nestjs/core';
-import { AppModule } from '../../app.module';
+import { Injectable } from '@nestjs/common';
 import { CandidatePaymentService } from '../../modules/candidate-payment/candidate-payment.service';
+import { CreateCandidatePlanDto } from '../../modules/candidate-payment/dto/create-candidate-plan.dto';
 
-async function bootstrap() {
-  const app = await NestFactory.createApplicationContext(AppModule);
-  
-  try {
-    const candidatePaymentService = app.get(CandidatePaymentService);
+@Injectable()
+export class CandidatePlanSeeder {
+  constructor(private readonly candidatePaymentService: CandidatePaymentService) {}
+
+  async seed() {
+    console.log('Seeding candidate plans...');
     
-    console.log('Seeding default candidate plan...');
-    
-    // Check if default plan already exists
-    const existingPlans = await candidatePaymentService.findAllPlans();
-    
-    if (existingPlans.length === 0) {
-      // Create default plan
-      await candidatePaymentService.createPlan({
-        name: 'Job Application Access',
-        description: 'One-time payment for unlimited job applications (15 per day)',
-        price: 15.00,
+    try {
+      // Check if plans already exist
+      const existingPlansResult = await this.candidatePaymentService.findAllPlans(1, 100);
+      
+      // Access the plans array from the result
+      if (existingPlansResult.plans.length === 0) {
+        // Create default plans
+        await this.createDefaultPlans();
+        console.log('Candidate plans seeded successfully');
+      } else {
+        console.log(`Skipping candidate plan seeding. ${existingPlansResult.plans.length} plans already exist.`);
+      }
+    } catch (error) {
+      console.error('Error seeding candidate plans:', error.message);
+    }
+  }
+
+  private async createDefaultPlans() {
+    const defaultPlans: CreateCandidatePlanDto[] = [
+      {
+        name: 'Basic Plan',
+        description: 'Apply for up to 15 jobs per day',
+        price: 9.99,
         currency: 'usd',
         dailyApplicationLimit: 15
-      });
-      
-      console.log('Default candidate plan created successfully');
-    } else {
-      console.log('Default candidate plan already exists');
-    }
-  } catch (error) {
-    console.error('Error seeding default candidate plan:', error);
-  } finally {
-    await app.close();
-  }
-}
+      },
+      {
+        name: 'Standard Plan',
+        description: 'Apply for up to 30 jobs per day',
+        price: 19.99,
+        currency: 'usd',
+        dailyApplicationLimit: 30
+      },
+      {
+        name: 'Premium Plan',
+        description: 'Apply for up to 50 jobs per day',
+        price: 29.99,
+        currency: 'usd',
+        dailyApplicationLimit: 50
+      }
+    ];
 
-bootstrap(); 
+    for (const planData of defaultPlans) {
+      await this.candidatePaymentService.createPlan(planData);
+    }
+  }
+} 

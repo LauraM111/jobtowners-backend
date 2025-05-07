@@ -45,20 +45,26 @@ export class CandidatePaymentService {
         name: createCandidatePlanDto.name,
         description: createCandidatePlanDto.description || 'Candidate job application plan',
       });
-
+      
+      // Create a one-time price (not recurring)
       const price = await this.stripe.prices.create({
         product: product.id,
         unit_amount: Math.round(createCandidatePlanDto.price * 100), // Convert to cents
         currency: createCandidatePlanDto.currency || 'usd',
       });
-
+      
       // Create plan in database
       const plan = await this.candidatePlanModel.create({
-        ...createCandidatePlanDto,
+        name: createCandidatePlanDto.name,
+        description: createCandidatePlanDto.description,
+        price: createCandidatePlanDto.price,
+        currency: createCandidatePlanDto.currency || 'usd',
+        dailyApplicationLimit: createCandidatePlanDto.dailyApplicationLimit,
         stripeProductId: product.id,
         stripePriceId: price.id,
+        status: 'active',
       }, { transaction });
-
+      
       await transaction.commit();
       return plan;
     } catch (error) {
@@ -69,17 +75,26 @@ export class CandidatePaymentService {
   }
 
   /**
-   * Get all candidate plans
+   * Find all candidate plans with pagination
    */
-  async findAllPlans(): Promise<CandidatePlan[]> {
-    return this.candidatePlanModel.findAll({
+  async findAllPlans(page = 1, limit = 10): Promise<{ plans: CandidatePlan[]; total: number }> {
+    const offset = (page - 1) * limit;
+    
+    const { count, rows } = await this.candidatePlanModel.findAndCountAll({
       where: { status: 'active' },
-      order: [['price', 'ASC']]
+      limit,
+      offset,
+      order: [['createdAt', 'DESC']],
     });
+    
+    return {
+      plans: rows,
+      total: count,
+    };
   }
 
   /**
-   * Get a candidate plan by ID
+   * Find a candidate plan by ID
    */
   async findPlanById(id: string): Promise<CandidatePlan> {
     const plan = await this.candidatePlanModel.findByPk(id);
@@ -104,17 +119,29 @@ export class CandidatePaymentService {
         throw new NotFoundException(`Candidate plan with ID ${id} not found`);
       }
       
-      // If price is being updated, update Stripe price
-      if (updateCandidatePlanDto.price !== undefined) {
-        // Create a new price in Stripe
-        const price = await this.stripe.prices.create({
+      // Update Stripe product if name or description changed
+      if (updateCandidatePlanDto.name || updateCandidatePlanDto.description) {
+        await this.stripe.products.update(plan.stripeProductId, {
+          name: updateCandidatePlanDto.name || plan.name,
+          description: updateCandidatePlanDto.description || plan.description,
+        });
+      }
+      
+      // If price changed, create a new price in Stripe
+      if (updateCandidatePlanDto.price || updateCandidatePlanDto.currency) {
+        const newPrice = await this.stripe.prices.create({
           product: plan.stripeProductId,
-          unit_amount: Math.round(updateCandidatePlanDto.price * 100),
+          unit_amount: Math.round((updateCandidatePlanDto.price || plan.price) * 100),
           currency: updateCandidatePlanDto.currency || plan.currency,
         });
         
-        // Add the new price ID to the update data
-        updateCandidatePlanDto.stripePriceId = price.id;
+        // Archive the old price
+        if (plan.stripePriceId) {
+          await this.stripe.prices.update(plan.stripePriceId, { active: false });
+        }
+        
+        // Update the price ID in the plan
+        updateCandidatePlanDto.stripePriceId = newPrice.id;
       }
       
       // Update plan in database
@@ -130,7 +157,7 @@ export class CandidatePaymentService {
   }
 
   /**
-   * Delete a candidate plan
+   * Remove a candidate plan (soft delete)
    */
   async removePlan(id: string): Promise<void> {
     const transaction = await this.sequelize.transaction();
@@ -142,10 +169,15 @@ export class CandidatePaymentService {
         throw new NotFoundException(`Candidate plan with ID ${id} not found`);
       }
       
-      // Deactivate Stripe product
+      // Archive the Stripe product
       await this.stripe.products.update(plan.stripeProductId, { active: false });
       
-      // Soft delete plan
+      // Archive the Stripe price
+      if (plan.stripePriceId) {
+        await this.stripe.prices.update(plan.stripePriceId, { active: false });
+      }
+      
+      // Soft delete the plan
       await plan.update({ status: 'inactive' }, { transaction });
       
       await transaction.commit();
@@ -657,5 +689,81 @@ export class CandidatePaymentService {
     }
     
     return order;
+  }
+
+  /**
+   * Get payment statistics for a user
+   */
+  async getPaymentStats(userId: string): Promise<any> {
+    try {
+      // If userId is undefined or null, return empty stats
+      if (!userId) {
+        this.logger.warn('Attempted to get payment stats with undefined userId');
+        return {
+          totalSpent: 0,
+          ordersCount: 0,
+          lastPayment: null,
+          hasPaidPlan: false,
+          applicationLimit: {
+            dailyLimit: 15,
+            applicationsUsedToday: 0,
+            lastResetDate: new Date(),
+            hasPaid: false
+          }
+        };
+      }
+
+      // Get all orders for the user
+      const orders = await this.candidateOrderModel.findAll({
+        where: { userId, status: 'completed' }
+      });
+
+      // Calculate total spent
+      const totalSpent = orders.reduce((sum, order) => sum + Number(order.amount), 0);
+
+      // Get the last payment date
+      const lastPayment = orders.length > 0 
+        ? orders.sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())[0].createdAt
+        : null;
+
+      // Get application limit
+      let applicationLimit = await this.applicationLimitModel.findOne({
+        where: { userId }
+      });
+
+      if (!applicationLimit) {
+        // Create default application limit if it doesn't exist
+        applicationLimit = await this.applicationLimitModel.create({
+          userId,
+          dailyLimit: 15,
+          applicationsUsedToday: 0,
+          lastResetDate: new Date(),
+          hasPaid: false
+        });
+      }
+
+      return {
+        totalSpent,
+        ordersCount: orders.length,
+        lastPayment,
+        hasPaidPlan: applicationLimit.hasPaid,
+        applicationLimit
+      };
+    } catch (error) {
+      this.logger.error(`Error getting payment stats: ${error.message}`);
+      // Return default stats instead of throwing error
+      return {
+        totalSpent: 0,
+        ordersCount: 0,
+        lastPayment: null,
+        hasPaidPlan: false,
+        applicationLimit: {
+          dailyLimit: 15,
+          applicationsUsedToday: 0,
+          lastResetDate: new Date(),
+          hasPaid: false
+        }
+      };
+    }
   }
 } 

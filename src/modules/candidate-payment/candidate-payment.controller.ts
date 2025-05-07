@@ -11,7 +11,10 @@ import {
   BadRequestException,
   RawBodyRequest,
   Req,
-  HttpCode
+  HttpCode,
+  Query,
+  DefaultValuePipe,
+  ParseIntPipe
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth, ApiQuery } from '@nestjs/swagger';
 import { CandidatePaymentService } from './candidate-payment.service';
@@ -59,10 +62,18 @@ export class CandidatePaymentController {
   @Get('plans')
   @ApiOperation({ summary: 'Get all candidate plans' })
   @ApiResponse({ status: 200, description: 'Plans retrieved successfully' })
-  async findAllPlans() {
+  @ApiQuery({ name: 'page', required: false, type: Number })
+  @ApiQuery({ name: 'limit', required: false, type: Number })
+  async getAllPlans(
+    @Query('page', new DefaultValuePipe(1), ParseIntPipe) page: number,
+    @Query('limit', new DefaultValuePipe(10), ParseIntPipe) limit: number
+  ) {
     try {
-      const plans = await this.candidatePaymentService.findAllPlans();
-      return successResponse(plans, 'Candidate plans retrieved successfully');
+      const { plans, total } = await this.candidatePaymentService.findAllPlans(page, limit);
+      return successResponse(
+        { plans, total, page, limit },
+        'Candidate plans retrieved successfully'
+      );
     } catch (error) {
       throw new BadRequestException(error.message);
     }
@@ -71,7 +82,7 @@ export class CandidatePaymentController {
   @Get('plans/:id')
   @ApiOperation({ summary: 'Get a candidate plan by ID' })
   @ApiResponse({ status: 200, description: 'Plan retrieved successfully' })
-  async findPlanById(@Param('id') id: string) {
+  async getPlanById(@Param('id') id: string) {
     try {
       const plan = await this.candidatePaymentService.findPlanById(id);
       return successResponse(plan, 'Candidate plan retrieved successfully');
@@ -104,7 +115,7 @@ export class CandidatePaymentController {
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Delete a candidate plan (Admin only)' })
   @ApiResponse({ status: 200, description: 'Plan deleted successfully' })
-  async removePlan(@Param('id') id: string) {
+  async deletePlan(@Param('id') id: string) {
     try {
       await this.candidatePaymentService.removePlan(id);
       return successResponse(null, 'Candidate plan deleted successfully');
@@ -235,12 +246,31 @@ export class CandidatePaymentController {
   @Get('payment-stats')
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
-  @ApiOperation({ summary: 'Get user payment and application statistics' })
-  @ApiResponse({ status: 200, description: 'Payment stats retrieved successfully' })
-  async getUserPaymentStats(@Request() req) {
+  @ApiOperation({ summary: 'Get payment statistics for the current user' })
+  @ApiResponse({ status: 200, description: 'Payment statistics retrieved successfully' })
+  async getPaymentStats(@Request() req) {
     try {
-      const stats = await this.candidatePaymentService.getUserPaymentStats(req.user.sub);
-      return successResponse(stats, 'Payment stats retrieved successfully');
+      // Check if user exists in the request
+      const userId = req.user?.sub;
+      
+      if (!userId) {
+        return successResponse({
+          totalSpent: 0,
+          ordersCount: 0,
+          lastPayment: null,
+          hasPaidPlan: false,
+          applicationLimit: {
+            dailyLimit: 15,
+            applicationsUsedToday: 0,
+            lastResetDate: new Date(),
+            hasPaid: false
+          }
+        }, 'No payment stats found');
+      }
+      
+      const stats = await this.candidatePaymentService.getPaymentStats(userId);
+      
+      return successResponse(stats, 'Payment statistics retrieved successfully');
     } catch (error) {
       throw new BadRequestException(error.message);
     }

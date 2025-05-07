@@ -15,6 +15,7 @@ import { JobApplicationStatus } from './entities/job-application.entity';
 import { UpdateStatusDto } from './dto/update-status.dto';
 import { JobService } from '../job/job.service';
 import { UserType } from '../user/entities/user.entity';
+import { Op } from 'sequelize';
 
 @Controller('job-applications')
 export class JobApplicationController {
@@ -25,16 +26,21 @@ export class JobApplicationController {
   ) {}
 
   @Get('employer-applicants')
-  @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles('employer')
+  @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
-  @ApiOperation({ summary: 'Get list of candidates who applied to employer jobs' })
-  @ApiResponse({ status: 200, description: 'Candidates retrieved successfully' })
-  async getJobApplicants(@Request() req) {
+  @ApiOperation({ summary: 'Get all applicants for employer jobs' })
+  @ApiResponse({ status: 200, description: 'Applicants retrieved successfully' })
+  async getEmployerApplicants(@Request() req) {
     try {
-      const employerId = req.user.sub;
-      const applicants = await this.jobApplicationService.findApplicantsByEmployer(employerId);
-      return successResponse(applicants, 'Candidates retrieved successfully');
+      // Check if user exists and has an ID
+      const userId = req.user?.sub;
+      
+      if (!userId) {
+        return successResponse({ applicants: [], total: 0 }, 'No applicants found');
+      }
+      
+      const { applicants, total } = await this.jobApplicationService.getEmployerApplicants(userId);
+      return successResponse({ applicants, total }, 'Applicants retrieved successfully');
     } catch (error) {
       throw new BadRequestException(error.message);
     }
@@ -69,14 +75,66 @@ export class JobApplicationController {
     }
   }
 
-  @UseGuards(JwtAuthGuard)
   @Get()
-  findAll(
-    @CurrentUser('id') userId: string,
-    @CurrentUser('isAdmin') isAdmin: boolean,
-    @Query() filterDto: FilterJobApplicationDto,
-  ): Promise<JobApplication[]> {
-    return this.jobApplicationService.findAll(filterDto, userId, isAdmin);
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Get job applications based on filter' })
+  @ApiResponse({ status: 200, description: 'Job applications retrieved successfully' })
+  @ApiQuery({ name: 'filter', enum: ['all', 'candidate', 'employer'], required: false })
+  @ApiQuery({ name: 'page', required: false, type: Number })
+  @ApiQuery({ name: 'limit', required: false, type: Number })
+  @ApiQuery({ name: 'status', required: false })
+  async findAll(
+    @Request() req,
+    @Query('filter') filter: string = 'all',
+    @Query('page') page: string = '1',
+    @Query('limit') limit: string = '10',
+    @Query('status') status?: string,
+  ) {
+    try {
+      // Parse page and limit to numbers
+      const parsedPage = parseInt(page, 10) || 1;
+      const parsedLimit = parseInt(limit, 10) || 10;
+      
+      // Check if user exists in the request
+      const userId = req.user?.sub;
+      const userType = req.user?.userType;
+      
+      if (!userId) {
+        console.warn('User ID is undefined in job applications findAll');
+        return successResponse(
+          { 
+            applications: [], 
+            total: 0, 
+            page: parsedPage, 
+            limit: parsedLimit 
+          },
+          'No applications found'
+        );
+      }
+      
+      const { applications, total } = await this.jobApplicationService.findAll(
+        userId,
+        userType,
+        filter,
+        parsedPage,
+        parsedLimit,
+        status
+      );
+      
+      return successResponse(
+        { 
+          applications, 
+          total, 
+          page: parsedPage, 
+          limit: parsedLimit 
+        },
+        'Job applications retrieved successfully'
+      );
+    } catch (error) {
+      console.error('Error finding job applications:', error.message);
+      throw new BadRequestException(error.message);
+    }
   }
 
   @UseGuards(JwtAuthGuard, RolesGuard)
@@ -188,8 +246,8 @@ export class JobApplicationController {
   @ApiQuery({ name: 'jobId', required: false })
   @ApiQuery({ name: 'applicantId', required: false })
   @ApiQuery({ name: 'companyId', required: false })
+  @ApiQuery({ name: 'page', required: false, type: Number })
   @ApiQuery({ name: 'limit', required: false, type: Number })
-  @ApiQuery({ name: 'offset', required: false, type: Number })
   @ApiQuery({ name: 'sortBy', required: false })
   @ApiQuery({ name: 'sortOrder', required: false, enum: ['ASC', 'DESC'] })
   async adminManageApplications(
@@ -199,24 +257,35 @@ export class JobApplicationController {
       jobId?: string;
       applicantId?: string;
       companyId?: string;
-      limit?: number;
-      offset?: number;
+      page?: string;
+      limit?: string;
       sortBy?: string;
       sortOrder?: 'ASC' | 'DESC';
     }
   ) {
     try {
-      // Create a filter DTO from the query parameters
-      const filterDto: FilterJobApplicationDto = {
-        status: query.status,
-        jobId: query.jobId,
-        applicantId: query.applicantId,
-        limit: query.limit ? parseInt(query.limit.toString()) : 10,
-        offset: query.offset ? parseInt(query.offset.toString()) : 0,
-        sortBy: query.sortBy || 'createdAt',
-        sortOrder: query.sortOrder || 'DESC',
-      };
-
+      // Parse page and limit
+      const page = query.page ? parseInt(query.page, 10) : 1;
+      const limit = query.limit ? parseInt(query.limit, 10) : 10;
+      
+      // Create a custom where clause for admin filtering
+      const customWhere: any = {};
+      
+      // Add status filter if provided
+      if (query.status) {
+        customWhere.status = query.status;
+      }
+      
+      // Add job filter if provided
+      if (query.jobId) {
+        customWhere.jobId = query.jobId;
+      }
+      
+      // Add applicant filter if provided
+      if (query.applicantId) {
+        customWhere.applicantId = query.applicantId;
+      }
+      
       // Add company filter if provided
       if (query.companyId) {
         // Get all jobs from this company
@@ -227,22 +296,22 @@ export class JobApplicationController {
         // Extract job IDs
         const jobIds = jobs.jobs.map(job => job.id);
         
-        // Add to filter
-        filterDto.jobIds = jobIds;
+        if (jobIds.length > 0) {
+          customWhere.jobId = { [Op.in]: jobIds };
+        }
       }
-
-      // Get applications with admin privileges (isAdmin = true)
-      const applications = await this.jobApplicationService.findAll(
-        filterDto,
-        req.user.sub,
-        true
+      
+      // Get applications with admin privileges
+      const { applications, total } = await this.jobApplicationService.findAllWithCustomWhere(
+        customWhere,
+        page,
+        limit,
+        query.sortBy || 'createdAt',
+        query.sortOrder || 'DESC'
       );
-
-      // Get total count for pagination
-      const total = await this.jobApplicationService.count(filterDto);
-
+      
       return successResponse(
-        { applications, total },
+        { applications, total, page, limit },
         'Applications retrieved successfully'
       );
     } catch (error) {

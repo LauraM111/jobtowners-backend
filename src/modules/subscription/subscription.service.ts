@@ -128,19 +128,24 @@ export class SubscriptionService {
   }
 
   /**
-   * Confirm subscription payment
+   * Confirm a subscription payment
    */
   async confirmSubscription(userId: string, subscriptionId: string, paymentIntentId: string): Promise<Subscription> {
     const transaction = await this.sequelize.transaction();
     
     try {
-      // Find the subscription
+      // Find the subscription with its plan
       const subscription = await this.subscriptionModel.findOne({
-        where: { 
+        where: {
           id: subscriptionId,
           userId
         },
-        include: [{ model: SubscriptionPlan }],
+        include: [
+          {
+            model: this.subscriptionPlanModel,
+            as: 'plan'
+          }
+        ],
         transaction
       });
       
@@ -148,59 +153,32 @@ export class SubscriptionService {
         throw new NotFoundException('Subscription not found');
       }
       
-      // Verify payment intent status with Stripe
+      // Verify the payment intent
       const paymentIntent = await this.stripeService.retrievePaymentIntent(paymentIntentId);
       
       if (paymentIntent.status !== 'succeeded') {
-        throw new BadRequestException(`Payment not successful. Status: ${paymentIntent.status}`);
+        throw new BadRequestException('Payment has not been completed');
       }
       
-      // Check if customer has a payment method
-      const customer = await this.stripeService.retrieveCustomer(subscription.stripeCustomerId);
+      // Get the plan details for calculating the end date
+      const plan = subscription.plan;
       
-      if (!customer.invoice_settings.default_payment_method) {
-        // If payment intent has a payment method, attach it
-        if (paymentIntent.payment_method) {
-          await this.stripeService.attachPaymentMethodToCustomer(
-            subscription.stripeCustomerId,
-            paymentIntent.payment_method as string
-          );
-          
-          await this.stripeService.updateCustomerDefaultPaymentMethod(
-            subscription.stripeCustomerId,
-            paymentIntent.payment_method as string
-          );
-        } else {
-          throw new BadRequestException(
-            'Customer has no default payment method. Please add a payment method first.'
-          );
-        }
+      if (!plan) {
+        throw new BadRequestException('Subscription plan not found');
       }
       
-      // Calculate end date based on plan interval
-      const endDate = this.calculateEndDate(
-        new Date(),
-        subscription.plan.interval,
-        subscription.plan.intervalCount
-      );
-      
-      // Create Stripe subscription
-      const stripeSubscription = await this.stripeService.createSubscription(
-        subscription.stripeCustomerId,
-        subscription.plan.stripePriceId
-      );
-      
-      // Update subscription
+      // Update the subscription status
       await subscription.update({
         status: SubscriptionStatus.ACTIVE,
-        stripeSubscriptionId: stripeSubscription.id,
         startDate: new Date(),
-        endDate
+        endDate: this.calculateEndDate(new Date(), plan.interval, plan.intervalCount),
+        paymentIntentId: paymentIntent.id,
+        lastPaymentDate: new Date()
       }, { transaction });
       
       await transaction.commit();
       
-      return subscription;
+      return this.findSubscriptionById(subscription.id);
     } catch (error) {
       await transaction.rollback();
       this.logger.error(`Error confirming subscription: ${error.message}`);
@@ -209,16 +187,34 @@ export class SubscriptionService {
   }
 
   /**
-   * Get user's active subscriptions
+   * Get all subscriptions for a user
    */
   async getUserSubscriptions(userId: string): Promise<Subscription[]> {
-    return this.subscriptionModel.findAll({
-      where: { 
-        userId,
-        status: SubscriptionStatus.ACTIVE
-      },
-      include: [{ model: SubscriptionPlan }]
-    });
+    try {
+      // If userId is undefined or null, return empty array
+      if (!userId) {
+        this.logger.warn('Attempted to get subscriptions with undefined userId');
+        return [];
+      }
+
+      return this.subscriptionModel.findAll({
+        where: { 
+          userId,
+          status: 'active'
+        },
+        include: [
+          {
+            model: this.subscriptionPlanModel,
+            as: 'plan'
+          }
+        ],
+        order: [['createdAt', 'DESC']]
+      });
+    } catch (error) {
+      this.logger.error(`Error getting user subscriptions: ${error.message}`);
+      // Return empty array instead of throwing error
+      return [];
+    }
   }
 
   /**
@@ -265,7 +261,7 @@ export class SubscriptionService {
   }
 
   /**
-   * Calculate subscription end date based on interval
+   * Calculate the end date based on interval and count
    */
   private calculateEndDate(startDate: Date, interval: string, count: number): Date {
     const endDate = new Date(startDate);
@@ -284,7 +280,8 @@ export class SubscriptionService {
         endDate.setFullYear(endDate.getFullYear() + count);
         break;
       default:
-        endDate.setMonth(endDate.getMonth() + 1); // Default to 1 month
+        // Default to 30 days if interval is not recognized
+        endDate.setDate(endDate.getDate() + 30);
     }
     
     return endDate;
@@ -465,5 +462,31 @@ export class SubscriptionService {
     }
     
     return subscription;
+  }
+
+  /**
+   * Get payment methods for a user
+   */
+  async getPaymentMethods(userId: string): Promise<any[]> {
+    try {
+      if (!userId) {
+        return [];
+      }
+      
+      // Get the user to check if they have a Stripe customer ID
+      const user = await this.userModel.findByPk(userId);
+      
+      if (!user || !user.stripeCustomerId) {
+        return [];
+      }
+      
+      // Get payment methods from Stripe
+      const paymentMethods = await this.stripeService.listPaymentMethods(user.stripeCustomerId);
+      
+      return paymentMethods;
+    } catch (error) {
+      this.logger.error(`Error getting payment methods: ${error.message}`);
+      return [];
+    }
   }
 } 

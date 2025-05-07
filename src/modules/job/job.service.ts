@@ -1,7 +1,7 @@
 import { Injectable, NotFoundException, BadRequestException, Logger, ForbiddenException } from '@nestjs/common';
 import { InjectModel } from '@nestjs/sequelize';
 import { Sequelize } from 'sequelize-typescript';
-import { Job, JobStatus, VerificationStatus } from './entities/job.entity';
+import { Job, JobStatus, VerificationStatus, JobType } from './entities/job.entity';
 import { CreateJobDto } from './dto/create-job.dto';
 import { UpdateJobDto } from './dto/update-job.dto';
 import { User } from '../user/entities/user.entity';
@@ -102,73 +102,50 @@ export class JobService {
    */
   async findAll(query: any = {}): Promise<{ jobs: Job[], total: number }> {
     const { 
-      status = JobStatus.ACTIVE,
-      category,
-      jobType,
-      country,
-      city,
-      industry,
+      limit, 
+      offset, 
+      status, 
+      verificationStatus, 
+      userId, 
+      companyId, 
       search,
-      limit,
-      offset = 0,
-      userId,
-      companyId,
-      currentUserId
+      jobType,
+      currentUserId 
     } = query;
     
-    const whereClause: any = {};
+    // Build where clause
+    const where: any = {};
     
-    // Filter by status
     if (status) {
-      whereClause.status = status;
+      where.status = status;
     }
     
-    // Filter by category
-    if (category) {
-      whereClause.category = category;
+    if (verificationStatus) {
+      where.verificationStatus = verificationStatus;
     }
     
-    // Filter by job type
-    if (jobType) {
-      whereClause.jobType = jobType;
-    }
-    
-    // Filter by country
-    if (country) {
-      whereClause.country = country;
-    }
-    
-    // Filter by city
-    if (city) {
-      whereClause.city = city;
-    }
-    
-    // Filter by industry
-    if (industry) {
-      whereClause.industry = industry;
-    }
-    
-    // Filter by user ID
     if (userId) {
-      whereClause.userId = userId;
+      where.userId = userId;
     }
     
-    // Filter by company ID
     if (companyId) {
-      whereClause.companyId = companyId;
+      where.companyId = companyId;
     }
     
-    // Search in title and description
+    if (jobType) {
+      where.jobType = jobType;
+    }
+    
     if (search) {
-      whereClause[Op.or] = [
-        { jobTitle: { [Op.iLike]: `%${search}%` } },
-        { title: { [Op.iLike]: `%${search}%` } },
-        { jobDescription: { [Op.iLike]: `%${search}%` } }
+      where[Op.or] = [
+        { title: { [Op.like]: `%${search}%` } },
+        { jobTitle: { [Op.like]: `%${search}%` } },
+        { jobDescription: { [Op.like]: `%${search}%` } }
       ];
     }
     
     // Get total count for pagination
-    const total = await this.jobModel.count({ where: whereClause });
+    const total = await this.jobModel.count({ where: where });
     
     // Get user attributes safely
     let userAttributes = ['id', 'firstName', 'lastName', 'email'];
@@ -185,7 +162,7 @@ export class JobService {
     
     // Get jobs with pagination
     const options: any = {
-      where: whereClause,
+      where: where,
       order: [['createdAt', 'DESC']],
       include: [
         {
@@ -698,5 +675,27 @@ export class JobService {
     });
 
     return { jobs: jobsWithStatus, total };
+  }
+
+  /**
+   * Get job counts by type
+   */
+  async getJobCountsByType(): Promise<Record<string, number>> {
+    const counts = {};
+    
+    // Get counts for each job type
+    for (const type of Object.values(JobType)) {
+      const count = await this.jobModel.count({
+        where: {
+          jobType: type,
+          status: JobStatus.ACTIVE,
+          verificationStatus: VerificationStatus.APPROVED
+        }
+      });
+      
+      counts[type] = count;
+    }
+    
+    return counts;
   }
 }

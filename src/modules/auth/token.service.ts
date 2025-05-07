@@ -41,7 +41,7 @@ export class TokenService {
         userId: user.id,
       });
       
-      // Send verification email
+      // Send verification email with the correct URL format
       const verificationUrl = `${this.configService.get('FRONTEND_URL')}/verify-email?token=${token}`;
       await this.mailService.sendVerificationEmail(user.email, user.firstName, verificationUrl);
       
@@ -97,12 +97,17 @@ export class TokenService {
 
     // Check if token exists
     if (!tokenRecord) {
-      throw new BadRequestException('Invalid token');
+      throw new BadRequestException('Invalid or expired verification token. Please request a new one.');
     }
 
     // Check if token is expired
     if (new Date() > tokenRecord.expiresAt) {
-      throw new BadRequestException('Token has expired');
+      throw new BadRequestException('Token has expired. Please request a new one.');
+    }
+
+    // Check if token is already used
+    if (tokenRecord.used) {
+      throw new BadRequestException('This token has already been used. Please request a new one if needed.');
     }
 
     // Get the user
@@ -198,24 +203,13 @@ export class TokenService {
    * Verify an email verification token
    */
   async verifyEmailToken(token: string): Promise<User> {
-    const tokenRecord = await this.tokenModel.findOne({
-      where: { token, type: TokenType.EMAIL_VERIFICATION }
-    });
-    
-    if (!tokenRecord) {
-      throw new BadRequestException('Invalid token');
+    try {
+      // Use the common verifyToken method to avoid duplication
+      return await this.verifyToken(token, TokenType.EMAIL_VERIFICATION);
+    } catch (error) {
+      this.logger.error(`Error verifying email token: ${error.message}`, error.stack);
+      throw error; // Re-throw the error to be handled by the controller
     }
-    
-    const user = await this.userService.findById(tokenRecord.userId);
-    
-    if (user.isEmailVerified) {
-      throw new BadRequestException('Email already verified');
-    }
-    
-    user.isEmailVerified = true;
-    await user.save();
-    
-    return user;
   }
 
   /**

@@ -87,48 +87,29 @@ export class JobApplicationService {
    * Find all job applications with filtering
    */
   async findAll(
-    filterDto: FilterJobApplicationDto,
-    userId?: string,
-    isAdmin = false
-  ): Promise<JobApplication[]> {
-    const where: any = {};
-    
-    // Apply job ID filter
-    if (filterDto.jobId) {
-      where.jobId = filterDto.jobId;
-    }
-    
-    // Apply job IDs filter (for company filtering)
-    if (filterDto.jobIds && filterDto.jobIds.length > 0) {
-      where.jobId = {
-        [Op.in]: filterDto.jobIds
-      };
-    }
-    
-    // Apply applicant ID filter
-    if (filterDto.applicantId) {
-      where.applicantId = filterDto.applicantId;
-    }
-    
-    // Apply status filter
-    if (filterDto.status) {
-      where.status = filterDto.status;
-    }
-    
-    // Apply user-specific filters
-    if (userId) {
-      // If not admin, restrict to user's applications
-      if (!isAdmin) {
-        // Get user type
-        const user = await this.userModel.findByPk(userId);
-        
-        if (!user) {
-          throw new NotFoundException('User not found');
-        }
-        
-        // For employers, show applications for their jobs
-        if (user.userType === UserType.EMPLOYER) {
-          // Get all jobs created by this employer
+    userId: string,
+    userType: string,
+    filter: string = 'all',
+    page: number = 1,
+    limit: number = 10,
+    status?: string
+  ): Promise<{ applications: JobApplication[], total: number }> {
+    try {
+      const offset = (page - 1) * limit;
+      const where: any = {};
+      
+      // Add status filter if provided
+      if (status) {
+        where.status = status;
+      }
+      
+      // Filter based on user type and filter parameter
+      if (userType === UserType.CANDIDATE) {
+        // Candidates can only see their own applications
+        where.applicantId = userId;
+      } else if (userType === UserType.EMPLOYER) {
+        if (filter === 'employer') {
+          // Find jobs posted by this employer
           const jobs = await this.jobModel.findAll({
             where: { userId },
             attributes: ['id']
@@ -137,59 +118,77 @@ export class JobApplicationService {
           const jobIds = jobs.map(job => job.id);
           
           if (jobIds.length === 0) {
-            return []; // No jobs, so no applications
+            return { applications: [], total: 0 };
           }
           
-          where.jobId = {
-            [Op.in]: jobIds
-          };
-        } 
-        // For candidates, show only their applications
-        else if (user.userType === UserType.CANDIDATE) {
+          where.jobId = { [Op.in]: jobIds };
+        } else if (filter === 'candidate') {
+          // Employers can only see applications they've made (if any)
           where.applicantId = userId;
+        } else {
+          // For 'all', show both applications to their jobs and applications they've made
+          const jobs = await this.jobModel.findAll({
+            where: { userId },
+            attributes: ['id']
+          });
+          
+          const jobIds = jobs.map(job => job.id);
+          
+          if (jobIds.length > 0) {
+            where[Op.or] = [
+              { applicantId: userId },
+              { jobId: { [Op.in]: jobIds } }
+            ];
+          } else {
+            where.applicantId = userId;
+          }
         }
+      } else if (userType === UserType.ADMIN) {
+        // Admins can see all applications
+      } else {
+        // Other user types can only see their own applications
+        where.applicantId = userId;
       }
+      
+      // Count total matching applications
+      const total = await this.jobApplicationModel.count({ where });
+      
+      // Find applications with includes
+      const applications = await this.jobApplicationModel.findAll({
+        where,
+        limit,
+        offset,
+        order: [['createdAt', 'DESC']],
+        include: [
+          {
+            model: this.userModel,
+            as: 'applicant',
+            attributes: ['id', 'firstName', 'lastName', 'email']
+          },
+          {
+            model: this.jobModel,
+            as: 'job',
+            attributes: ['id', 'title', 'jobTitle', 'companyId', 'userId'],
+            include: [
+              {
+                model: this.userModel,
+                as: 'user',
+                attributes: ['id', 'firstName', 'lastName', 'email', 'companyName']
+              }
+            ]
+          },
+          {
+            model: this.resumeModel,
+            attributes: ['id'] // Only include the ID of the resume
+          }
+        ]
+      });
+      
+      return { applications, total };
+    } catch (error) {
+      console.error(`Error finding job applications: ${error.message}`);
+      throw error;
     }
-    
-    // Set up pagination
-    const limit = filterDto.limit || 10;
-    const offset = filterDto.offset || 0;
-    
-    // Set up sorting
-    const order: any = [
-      [filterDto.sortBy || 'createdAt', filterDto.sortOrder || 'DESC']
-    ];
-    
-    // Find applications with includes
-    return this.jobApplicationModel.findAll({
-      where,
-      limit,
-      offset,
-      order,
-      include: [
-        {
-          model: this.userModel,
-          as: 'applicant',
-          attributes: ['id', 'firstName', 'lastName', 'email']
-        },
-        {
-          model: this.jobModel,
-          as: 'job',
-          attributes: ['id', 'title', 'jobTitle', 'companyId', 'userId'],
-          include: [
-            {
-              model: this.userModel,
-              as: 'user',
-              attributes: ['id', 'firstName', 'lastName', 'email', 'companyName']
-            }
-          ]
-        },
-        {
-          model: this.resumeModel,
-          attributes: ['id'] // Only include the ID of the resume
-        }
-      ]
-    });
   }
 
   async findOne(id: string, userId?: string, isAdmin = false): Promise<JobApplication> {
@@ -517,5 +516,143 @@ export class JobApplicationService {
     }
     
     return this.jobApplicationModel.count({ where });
+  }
+
+  /**
+   * Get all applicants for employer jobs
+   */
+  async getEmployerApplicants(userId: string): Promise<{ applicants: any[], total: number }> {
+    try {
+      // If userId is undefined, return empty result
+      if (!userId) {
+        return { applicants: [], total: 0 };
+      }
+      
+      // Find all jobs posted by the employer
+      const jobs = await this.jobModel.findAll({
+        where: { userId },
+        attributes: ['id']
+      });
+      
+      if (jobs.length === 0) {
+        return { applicants: [], total: 0 };
+      }
+      
+      const jobIds = jobs.map(job => job.id);
+      
+      // Find all applications for these jobs
+      const { count, rows } = await this.jobApplicationModel.findAndCountAll({
+        where: {
+          jobId: {
+            [Op.in]: jobIds
+          }
+        },
+        include: [
+          {
+            model: this.userModel,
+            as: 'applicant',
+            attributes: ['id', 'firstName', 'lastName', 'email']
+          },
+          {
+            model: this.resumeModel,
+            attributes: ['id', 'firstName', 'lastName', 'email', 'phone']
+          },
+          {
+            model: this.jobModel,
+            attributes: ['id', 'jobTitle', 'title']
+          }
+        ],
+        order: [['createdAt', 'DESC']]
+      });
+      
+      // Group applicants by user ID to avoid duplicates
+      const applicantsMap = new Map();
+      
+      rows.forEach(application => {
+        const applicantId = application.applicant.id;
+        
+        if (!applicantsMap.has(applicantId)) {
+          applicantsMap.set(applicantId, {
+            id: applicantId,
+            firstName: application.applicant.firstName,
+            lastName: application.applicant.lastName,
+            email: application.applicant.email,
+            applications: []
+          });
+        }
+        
+        applicantsMap.get(applicantId).applications.push({
+          id: application.id,
+          jobId: application.jobId,
+          jobTitle: application.job.jobTitle || application.job.title,
+          status: application.status,
+          createdAt: application.createdAt
+        });
+      });
+      
+      const applicants = Array.from(applicantsMap.values());
+      
+      return {
+        applicants,
+        total: applicantsMap.size
+      };
+    } catch (error) {
+      console.error(`Error getting employer applicants: ${error.message}`);
+      throw error;
+    }
+  }
+
+  /**
+   * Find all job applications with custom where clause (for admin)
+   */
+  async findAllWithCustomWhere(
+    where: any,
+    page: number = 1,
+    limit: number = 10,
+    sortBy: string = 'createdAt',
+    sortOrder: 'ASC' | 'DESC' = 'DESC'
+  ): Promise<{ applications: JobApplication[], total: number }> {
+    try {
+      const offset = (page - 1) * limit;
+      
+      // Count total matching applications
+      const total = await this.jobApplicationModel.count({ where });
+      
+      // Find applications with includes
+      const applications = await this.jobApplicationModel.findAll({
+        where,
+        limit,
+        offset,
+        order: [[sortBy, sortOrder]],
+        include: [
+          {
+            model: this.userModel,
+            as: 'applicant',
+            attributes: ['id', 'firstName', 'lastName', 'email']
+          },
+          {
+            model: this.jobModel,
+            as: 'job',
+            attributes: ['id', 'title', 'jobTitle', 'companyId', 'userId'],
+            include: [
+              {
+                model: this.userModel,
+                as: 'user',
+                attributes: ['id', 'firstName', 'lastName', 'email', 'companyName']
+              }
+            ]
+          },
+          {
+            model: this.resumeModel,
+            attributes: ['id'] // Only include the ID of the resume
+          }
+        ]
+      });
+      
+      return { applications, total };
+    } catch (error) {
+      console.error(`Error finding job applications with custom where: ${error.message}`);
+      throw error;
+    }
   }
 } 

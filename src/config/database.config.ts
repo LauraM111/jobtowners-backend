@@ -62,7 +62,7 @@ export const getDatabaseConfig = (configService: ConfigService): SequelizeModule
       Job
     ],
     autoLoadModels: true,
-    synchronize: configService.get('NODE_ENV') === 'development',
-    logging: configService.get('NODE_ENV') === 'development' ? console.log : false,
+    synchronize: configService.get('DB_SYNC') === 'true',
+    logging: configService.get('DB_LOGGING') === 'true' ? console.log : false,
   };
 }; 

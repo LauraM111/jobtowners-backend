@@ -175,7 +175,8 @@ export class UserService {
         password: registrationDto.password,
         userType: UserType.EMPLOYER,
         status: UserStatus.INACTIVE, // New users are inactive until approved
-        termsAccepted: registrationDto.termsAccepted
+        termsAccepted: registrationDto.termsAccepted,
+        isEmailVerified: false, // Set email as unverified initially
       });
 
       // Send welcome email - don't await, just fire and forget
@@ -183,6 +184,14 @@ export class UserService {
         this.logger.error(`Failed to send welcome email: ${error.message}`);
       });
 
+      // Generate verification token and send verification email
+      try {
+        await this.tokenService.createVerificationToken(user);
+      } catch (error) {
+        this.logger.error(`Failed to send verification email: ${error.message}`);
+        // Continue even if email sending fails
+      }
+      
       return user;
     } catch (error) {
       // Handle specific errors

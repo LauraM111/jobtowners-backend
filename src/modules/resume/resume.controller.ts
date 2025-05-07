@@ -1,6 +1,6 @@
 import { 
   Controller, Get, Post, Body, Patch, Param, Delete, 
-  UseGuards, Request, NotFoundException, ForbiddenException, BadRequestException 
+  UseGuards, Request, NotFoundException, ForbiddenException, BadRequestException, UnauthorizedException, InternalServerErrorException 
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
 import { ResumeService } from './resume.service';
@@ -44,8 +44,33 @@ export class ResumeController {
   @ApiResponse({ status: 200, description: 'Personal details updated successfully' })
   @ApiBearerAuth()
   async updatePersonalDetails(@Request() req, @Body() personalDetailsDto: PersonalDetailsDto) {
-    const updatedDetails = await this.resumeService.updatePersonalDetails(req.user.sub, personalDetailsDto);
-    return successResponse(updatedDetails, 'Personal details updated successfully');
+    try {
+      const userId = req.user?.sub;
+      
+      if (!userId) {
+        throw new UnauthorizedException('User not authenticated');
+      }
+      
+      console.log(`Updating personal details for user ${userId}:`, personalDetailsDto);
+      
+      // Directly update or create the resume with personal details
+      const updatedDetails = await this.resumeService.updatePersonalDetails(userId, personalDetailsDto);
+      
+      if (!updatedDetails) {
+        throw new InternalServerErrorException('Failed to update personal details');
+      }
+      
+      console.log(`Personal details updated successfully for user ${userId}`);
+      return successResponse(updatedDetails, 'Personal details updated successfully');
+    } catch (error) {
+      console.error('Error updating personal details:', error);
+      
+      if (error instanceof NotFoundException) {
+        throw error;
+      }
+      
+      throw new BadRequestException(`Failed to update personal details: ${error.message}`);
+    }
   }
 
   @Get('me')
@@ -117,12 +142,54 @@ export class ResumeController {
   }
 
   @Patch('video')
-  @ApiOperation({ summary: 'Upload or update resume video' })
-  @ApiResponse({ status: 200, description: 'Video updated successfully' })
+  @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
-  async uploadVideo(@Request() req, @Body() uploadVideoDto: UploadVideoDto) {
-    const resume = await this.resumeService.updateVideo(req.user.sub, uploadVideoDto.videoUrl);
-    return successResponse(resume, 'Resume video updated successfully');
+  @ApiOperation({ summary: 'Update resume video URL' })
+  @ApiResponse({ status: 200, description: 'Video URL updated successfully' })
+  @ApiResponse({ status: 404, description: 'Resume not found' })
+  async updateVideoUrl(@Request() req, @Body() data: { videoUrl: string }) {
+    try {
+      const userId = req.user?.sub;
+      
+      if (!userId) {
+        throw new UnauthorizedException('User not authenticated');
+      }
+      
+      // First, check if the user has a resume
+      let resume = await this.resumeService.findByUserId(userId);
+      
+      // If no resume exists, create a basic one
+      if (!resume) {
+        console.log(`No resume found for user ${userId}, creating a new one`);
+        
+        // Create a basic resume DTO with required fields
+        const createResumeDto: CreateResumeDto = {
+          firstName: '',
+          lastName: '',
+          email: '',
+          // Add any other required fields with default values
+        };
+        
+        resume = await this.resumeService.create(userId, createResumeDto);
+        
+        if (!resume) {
+          throw new InternalServerErrorException('Failed to create resume');
+        }
+      }
+      
+      // Now update the video URL
+      const updatedResume = await this.resumeService.updateVideoUrl(resume.id, data.videoUrl);
+      
+      return successResponse(updatedResume, 'Resume video URL updated successfully');
+    } catch (error) {
+      console.error('Error updating resume video URL:', error.message);
+      
+      if (error instanceof NotFoundException) {
+        throw error;
+      }
+      
+      throw new BadRequestException(`Failed to update video URL: ${error.message}`);
+    }
   }
 
   @Patch('cv')

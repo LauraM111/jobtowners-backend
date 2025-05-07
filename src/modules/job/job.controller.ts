@@ -4,7 +4,7 @@ import {
   BadRequestException, UploadedFiles, Put
 } from '@nestjs/common';
 import { FileInterceptor, FilesInterceptor } from '@nestjs/platform-express';
-import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth, ApiConsumes, ApiBody, ApiQuery } from '@nestjs/swagger';
+import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth, ApiConsumes, ApiBody, ApiQuery, ApiParam } from '@nestjs/swagger';
 import { JobService } from './job.service';
 import { CreateJobDto } from './dto/create-job.dto';
 import { UpdateJobDto } from './dto/update-job.dto';
@@ -18,8 +18,7 @@ import { extname } from 'path';
 import { v4 as uuidv4 } from 'uuid';
 import { Public } from '../auth/decorators/public.decorator';
 import { VerifyJobDto } from './dto/verify-job.dto';
-import { VerificationStatus } from './entities/job.entity';
-import { JobStatus } from './entities/job.entity';
+import { VerificationStatus, JobType, JobStatus } from './entities/job.entity';
 import { JwtService } from '@nestjs/jwt';
 
 @ApiTags('Jobs')
@@ -426,5 +425,71 @@ export class JobController {
     } catch (error) {
       throw new BadRequestException(error.message);
     }
+  }
+
+  @Get('types')
+  @Public()
+  @ApiOperation({ summary: 'Get all available job types' })
+  @ApiResponse({ status: 200, description: 'Job types retrieved successfully' })
+  async getJobTypes() {
+    const jobTypes = Object.values(JobType);
+    return successResponse(jobTypes, 'Job types retrieved successfully');
+  }
+
+  @Get('by-type/:jobType')
+  @Public()
+  @ApiOperation({ summary: 'Get jobs by type' })
+  @ApiResponse({ status: 200, description: 'Jobs retrieved successfully' })
+  @ApiParam({ name: 'jobType', enum: JobType, description: 'Job type to filter by' })
+  @ApiQuery({ name: 'limit', required: false, type: Number })
+  @ApiQuery({ name: 'offset', required: false, type: Number })
+  @ApiQuery({ name: 'search', required: false, type: String })
+  async getJobsByType(
+    @Param('jobType') jobType: JobType,
+    @Query('limit') limit?: number,
+    @Query('offset') offset?: number,
+    @Query('search') search?: string,
+    @Request() req?: any,
+  ) {
+    // Extract token from Authorization header for checking if user has applied
+    let currentUserId = null;
+    
+    try {
+      const authHeader = req.headers.authorization;
+      if (authHeader && authHeader.startsWith('Bearer ')) {
+        const token = authHeader.substring(7);
+        const decoded = this.jwtService.decode(token);
+        if (decoded && decoded.sub) {
+          currentUserId = decoded.sub;
+        }
+      }
+    } catch (error) {
+      console.log('Error extracting user from token:', error);
+    }
+    
+    const { jobs, total } = await this.jobService.findAll({
+      limit,
+      offset,
+      jobType,
+      status: JobStatus.ACTIVE,
+      verificationStatus: VerificationStatus.APPROVED,
+      search,
+      currentUserId
+    });
+    
+    return successResponse({ 
+      jobs, 
+      total,
+      jobType 
+    }, `${jobType} jobs retrieved successfully`);
+  }
+
+  @Get('counts-by-type')
+  @Public()
+  @ApiOperation({ summary: 'Get job counts by type' })
+  @ApiResponse({ status: 200, description: 'Job counts retrieved successfully' })
+  async getJobCountsByType() {
+    const counts = await this.jobService.getJobCountsByType();
+    return successResponse(counts, 'Job counts retrieved successfully');
   }
 } 

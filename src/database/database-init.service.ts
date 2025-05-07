@@ -10,7 +10,6 @@ export class DatabaseInitService implements OnModuleInit {
   ) {}
 
   async onModuleInit() {
-    console.log("this.configService",this.configService);
     if (this.configService.get('NODE_ENV') === 'development') {
       console.log('Initializing database tables...');
       await this.initializeTables();

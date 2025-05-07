@@ -212,7 +212,7 @@ async function bootstrap() {
     await sequelize.query(`
       CREATE TABLE IF NOT EXISTS subscriptions (
         id VARCHAR(36) PRIMARY KEY,
-        userId INT NOT NULL,
+        userId VARCHAR(36) NOT NULL,
         planId VARCHAR(36) NOT NULL,
         stripeSubscriptionId VARCHAR(255),
         stripeCustomerId VARCHAR(255),
@@ -224,9 +224,9 @@ async function bootstrap() {
         createdAt DATETIME NOT NULL,
         updatedAt DATETIME NOT NULL,
         deletedAt DATETIME,
-        FOREIGN KEY (userId) REFERENCES users(id) ON DELETE CASCADE,
-        FOREIGN KEY (planId) REFERENCES subscription_plans(id) ON DELETE CASCADE
-      ) ENGINE=InnoDB;
+        CONSTRAINT fk_subscriptions_user FOREIGN KEY (userId) REFERENCES users(id) ON DELETE CASCADE,
+        CONSTRAINT fk_subscriptions_plan FOREIGN KEY (planId) REFERENCES subscription_plans(id) ON DELETE CASCADE
+      ) ENGINE=InnoDB CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
     `);
     
     console.log('Creating jobs table...');
@@ -399,6 +399,72 @@ async function bootstrap() {
         createdAt DATETIME NOT NULL,
         updatedAt DATETIME NOT NULL,
         CONSTRAINT fk_message_attachments_message FOREIGN KEY (messageId) REFERENCES messages(id) ON DELETE CASCADE
+      ) ENGINE=InnoDB CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+    `);
+    
+    // Add the contact_submissions table
+    console.log('Creating contact_submissions table...');
+    await sequelize.query(`
+      CREATE TABLE IF NOT EXISTS contact_submissions (
+        id VARCHAR(36) PRIMARY KEY,
+        name VARCHAR(255) NOT NULL,
+        email VARCHAR(255) NOT NULL,
+        phoneNumber VARCHAR(255),
+        subject VARCHAR(255) NOT NULL,
+        message TEXT NOT NULL,
+        status ENUM('new', 'read', 'responded') NOT NULL DEFAULT 'new',
+        respondedAt DATETIME,
+        respondedBy VARCHAR(36),
+        createdAt DATETIME NOT NULL,
+        updatedAt DATETIME NOT NULL,
+        CONSTRAINT fk_contact_submissions_responder FOREIGN KEY (respondedBy) REFERENCES users(id) ON DELETE SET NULL
+      ) ENGINE=InnoDB CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+    `);
+    
+    // Add the community tables
+    console.log('Creating community_posts table...');
+    await sequelize.query(`
+      CREATE TABLE IF NOT EXISTS community_posts (
+        id VARCHAR(36) PRIMARY KEY,
+        title VARCHAR(255) NOT NULL,
+        content TEXT NOT NULL,
+        postType ENUM('candidate', 'employer', 'general') NOT NULL,
+        authorId VARCHAR(36) NOT NULL,
+        status ENUM('active', 'pending', 'rejected', 'archived') NOT NULL DEFAULT 'active',
+        likesCount INT NOT NULL DEFAULT 0,
+        commentsCount INT NOT NULL DEFAULT 0,
+        createdAt DATETIME NOT NULL,
+        updatedAt DATETIME NOT NULL,
+        deletedAt DATETIME,
+        CONSTRAINT fk_community_posts_author FOREIGN KEY (authorId) REFERENCES users(id) ON DELETE CASCADE
+      ) ENGINE=InnoDB CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+    `);
+    
+    console.log('Creating post_comments table...');
+    await sequelize.query(`
+      CREATE TABLE IF NOT EXISTS post_comments (
+        id VARCHAR(36) PRIMARY KEY,
+        postId VARCHAR(36) NOT NULL,
+        authorId VARCHAR(36) NOT NULL,
+        content TEXT NOT NULL,
+        status ENUM('active', 'hidden', 'deleted') NOT NULL DEFAULT 'active',
+        createdAt DATETIME NOT NULL,
+        updatedAt DATETIME NOT NULL,
+        CONSTRAINT fk_post_comments_post FOREIGN KEY (postId) REFERENCES community_posts(id) ON DELETE CASCADE,
+        CONSTRAINT fk_post_comments_author FOREIGN KEY (authorId) REFERENCES users(id) ON DELETE CASCADE
+      ) ENGINE=InnoDB CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+    `);
+    
+    console.log('Creating post_likes table...');
+    await sequelize.query(`
+      CREATE TABLE IF NOT EXISTS post_likes (
+        id VARCHAR(36) PRIMARY KEY,
+        postId VARCHAR(36) NOT NULL,
+        userId VARCHAR(36) NOT NULL,
+        createdAt DATETIME NOT NULL,
+        CONSTRAINT fk_post_likes_post FOREIGN KEY (postId) REFERENCES community_posts(id) ON DELETE CASCADE,
+        CONSTRAINT fk_post_likes_user FOREIGN KEY (userId) REFERENCES users(id) ON DELETE CASCADE,
+        UNIQUE KEY unique_post_user_like (postId, userId)
       ) ENGINE=InnoDB CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
     `);
     

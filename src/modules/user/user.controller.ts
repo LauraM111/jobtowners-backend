@@ -23,6 +23,7 @@ import {
   DefaultValuePipe,
   UsePipes,
   ValidationPipe,
+  UnauthorizedException,
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiParam, ApiBearerAuth } from '@nestjs/swagger';
 import { UserService } from './user.service';
@@ -64,14 +65,26 @@ export class UserController {
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Get current user profile' })
   @ApiResponse({ status: 200, description: 'User profile retrieved successfully' })
-  async getProfile(@Request() req): Promise<any> {
-    const userId = req.user.sub || req.user.userId;
-    const user = await this.userService.findById(userId);
-    
-    // Format response based on user type
-    const profileData = await this.userService.formatUserProfile(user);
-    
-    return successResponse(profileData, 'User profile retrieved successfully');
+  async getProfile(@Request() req) {
+    try {
+      const userId = req.user?.sub;
+      
+      if (!userId) {
+        throw new UnauthorizedException('User not authenticated');
+      }
+      
+      const user = await this.userService.findById(userId);
+      
+      if (!user) {
+        throw new NotFoundException('User not found');
+      }
+      
+      // Return sanitized user profile
+      return successResponse(this.sanitizeUser(user), 'User profile retrieved successfully');
+    } catch (error) {
+      console.error('Error getting user profile:', error.message);
+      throw error;
+    }
   }
 
   @Patch('profile')
@@ -313,21 +326,29 @@ export class UserController {
   }
 
   @Get(':id')
-  @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(UserType.ADMIN)
+  @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
-  @ApiOperation({ summary: 'Get a user by ID (Admin only)' })
-  @ApiParam({ name: 'id', description: 'User ID' })
-  @ApiResponse({ 
-    status: 200, 
-    description: 'The user has been successfully retrieved.',
-    type: User 
-  })
-  @ApiResponse({ status: 404, description: 'User not found.' })
+  @ApiOperation({ summary: 'Get user by ID' })
+  @ApiResponse({ status: 200, description: 'User retrieved successfully' })
+  @ApiResponse({ status: 404, description: 'User not found' })
   async findOne(@Param('id') id: string) {
-    const user = await this.userService.findOne(id);
-    const { password, ...result } = user.toJSON();
-    return successResponse(result, 'User retrieved successfully');
+    try {
+      // Special case for 'me' - this is a fallback in case someone hits /users/me directly
+      if (id === 'me') {
+        throw new BadRequestException('Use /api/v1/users/profile to get your own profile');
+      }
+      
+      const user = await this.userService.findById(id);
+      
+      if (!user) {
+        throw new NotFoundException(`User with ID ${id} not found`);
+      }
+      
+      return successResponse(this.sanitizeUser(user), 'User retrieved successfully');
+    } catch (error) {
+      console.error(`Error finding user ${id}:`, error.message);
+      throw error;
+    }
   }
 
   @Patch(':id')
@@ -497,5 +518,63 @@ export class UserController {
     } catch (error) {
       throw new BadRequestException('Failed to create new admin user');
     }
+  }
+
+  @Get('me')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Get current user profile' })
+  @ApiResponse({ status: 200, description: 'User profile retrieved successfully' })
+  async getCurrentUser(@Request() req) {
+    try {
+      // Get the user ID from the JWT token
+      const userId = req.user?.sub;
+      
+      if (!userId) {
+        throw new UnauthorizedException('User not authenticated');
+      }
+      
+      // Get the user profile
+      const user = await this.userService.findById(userId);
+      
+      if (!user) {
+        throw new NotFoundException('User not found');
+      }
+      
+      // Remove sensitive information
+      const userProfile = {
+        id: user.id,
+        email: user.email,
+        firstName: user.firstName,
+        lastName: user.lastName,
+        phoneNumber: user.phoneNumber,
+        userType: user.userType,
+        status: user.status,
+        isEmailVerified: user.isEmailVerified,
+        companyName: user.companyName,
+        createdAt: user.createdAt
+      };
+      
+      return successResponse(userProfile, 'User profile retrieved successfully');
+    } catch (error) {
+      console.error('Error getting current user:', error.message);
+      throw error;
+    }
+  }
+
+  // Helper method to sanitize user data
+  private sanitizeUser(user: any) {
+    return {
+      id: user.id,
+      email: user.email,
+      firstName: user.firstName,
+      lastName: user.lastName,
+      phoneNumber: user.phoneNumber,
+      userType: user.userType,
+      status: user.status,
+      isEmailVerified: user.isEmailVerified,
+      companyName: user.companyName,
+      createdAt: user.createdAt
+    };
   }
 } 

@@ -24,10 +24,7 @@ export class JwtAuthGuard extends AuthGuard('jwt') {
     return super.canActivate(context);
   }
 
-  handleRequest(err, user, info) {
-    console.log('JWT Auth Guard - Error:', err);
-    console.log('JWT Auth Guard - User:', user);
-    console.log('JWT Auth Guard - Info:', info);
+  handleRequest(err, user, info) { 
     
     if (err || !user) {
       throw err || new UnauthorizedException('Authentication required. Please login.');
