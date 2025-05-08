@@ -101,6 +101,7 @@ export class JobController {
   }
 
   @Get()
+  @Public()
   @ApiOperation({ summary: 'Get all jobs' })
   @ApiResponse({ status: 200, description: 'Jobs retrieved successfully' })
   @ApiQuery({ name: 'limit', required: false, type: Number })
@@ -213,6 +214,7 @@ export class JobController {
   }
 
   @Get(':id')
+  @Public()
   @ApiOperation({ summary: 'Get a job by ID' })
   @ApiResponse({ status: 200, description: 'Job retrieved successfully' })
   @ApiQuery({ name: 'view', required: false, type: Boolean, description: 'Set to true to increment view count' })
