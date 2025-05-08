@@ -240,7 +240,7 @@ export class JobController {
       } catch (error) {
         console.log('Error extracting user from token:', error);
       }
-      
+          
       const job = await this.jobService.findOne(id, currentUserId);
       
       // Increment view count if requested

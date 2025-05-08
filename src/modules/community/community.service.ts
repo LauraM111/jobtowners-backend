@@ -23,17 +23,23 @@ export class CommunityService {
   // Post Management
   async createPost(createPostDto: CreatePostDto, user: any) {
     // Check if user exists and has an ID
-    if (!user || !user.id) {
+    console.log('Service received user:', user);
+    
+    // The user object from JWT has 'sub' instead of 'id'
+    if (!user || (!user.id && !user.sub)) {
       throw new UnauthorizedException('User not authenticated or invalid user data');
     }
-
+    
+    // Ensure user has an id property (use sub if id is not available)
+    const userId = user.id || user.sub;
+    
     // Validate post type based on user role
     this.validatePostTypeForUser(createPostDto.postType, user);
 
     // Create the post
     const post = await this.communityPostModel.create({
       ...createPostDto,
-      authorId: user.id,
+      authorId: userId, // Use the extracted userId
       status: user.userType === 'admin' ? PostStatus.ACTIVE : PostStatus.PENDING,
     });
 
@@ -77,7 +83,7 @@ export class CommunityService {
     };
   }
 
-  async getPostById(id: string) {
+  async getPostById(id: string, user?: any) {
     const post = await this.communityPostModel.findByPk(id, {
       include: [
         {
@@ -111,6 +117,34 @@ export class CommunityService {
     // Add comments to the post
     const postWithComments = post.toJSON();
     postWithComments.comments = comments;
+    
+    // Check if the user has liked the post (if user is authenticated)
+    if (user) {
+      console.log('Checking if user has liked post:', { user, postId: id });
+      
+      const userId = user.id || user.sub;
+      if (userId) {
+        try {
+          const like = await this.postLikeModel.findOne({
+            where: {
+              postId: id,
+              userId: userId,
+            },
+          });
+          
+          console.log('Like found:', like);
+          postWithComments.isLiked = !!like;
+        } catch (error) {
+          console.error('Error checking like status:', error);
+          postWithComments.isLiked = false;
+        }
+      } else {
+        console.log('No userId found in user object');
+        postWithComments.isLiked = false;
+      }
+    } else {
+      postWithComments.isLiked = false;
+    }
     
     return postWithComments;
   }
@@ -157,18 +191,25 @@ export class CommunityService {
   }
 
   // Comment Management
-  async addComment(postId: string, createCommentDto: CreateCommentDto, user: User) {
+  async addComment(postId: string, createCommentDto: CreateCommentDto, user: any) {
     const post = await this.communityPostModel.findByPk(postId);
     
     if (!post) {
       throw new NotFoundException(`Post with ID ${postId} not found`);
     }
     
+    // Extract userId from user object (use sub if id is not available)
+    const userId = user.id || user.sub;
+    
+    if (!userId) {
+      throw new UnauthorizedException('User ID not found in token');
+    }
+    
     // Create the comment
     const comment = await this.postCommentModel.create({
       ...createCommentDto,
       postId,
-      authorId: user.id,
+      authorId: userId, // Use the extracted userId
     });
     
     // Update comment count on the post
@@ -239,23 +280,39 @@ export class CommunityService {
       throw new NotFoundException(`Post with ID ${postId} not found`);
     }
     
+    // Extract userId from user object (use sub if id is not available)
+    const userId = user.id || user.sub;
+    
+    if (!userId) {
+      throw new UnauthorizedException('User ID not found in token');
+    }
+    
     // Check if user has already liked the post
     const existingLike = await this.postLikeModel.findOne({
       where: {
         postId,
-        userId: user.id,
+        userId: userId,
       },
-      attributes: ['id'] // Only select the ID to make the query lighter
     });
     
+    // If already liked, unlike it (toggle behavior)
     if (existingLike) {
-      throw new BadRequestException('You have already liked this post');
+      await this.postLikeModel.destroy({
+        where: {
+          id: existingLike.id
+        }
+      });
+      
+      // Update like count on the post
+      await post.decrement('likesCount');
+      
+      return { success: true, message: 'Post unliked successfully' };
     }
     
-    // Create the like
+    // Otherwise, like the post
     await this.postLikeModel.create({
       postId,
-      userId: user.id,
+      userId: userId,
     });
     
     // Update like count on the post
@@ -271,11 +328,18 @@ export class CommunityService {
       throw new NotFoundException(`Post with ID ${postId} not found`);
     }
     
+    // Extract userId from user object (use sub if id is not available)
+    const userId = user.id || user.sub;
+    
+    if (!userId) {
+      throw new UnauthorizedException('User ID not found in token');
+    }
+    
     // Find the like
     const like = await this.postLikeModel.findOne({
       where: {
         postId,
-        userId: user.id,
+        userId: userId, // Use the extracted userId
       },
       attributes: ['id'] // Only select the ID to make the query lighter
     });
@@ -358,6 +422,11 @@ export class CommunityService {
   private validatePostTypeForUser(postType: PostType, user: any) {
     console.log('Validating post type:', postType, 'for user type:', user.userType);
     
+    // All users can create general posts
+    if (postType === PostType.GENERAL) {
+      return true;
+    }
+    
     // Admins can post any type
     if (user.userType === 'admin') {
       return true;
@@ -365,12 +434,12 @@ export class CommunityService {
     
     // Candidates can only post candidate type
     if (user.userType === 'candidate' && postType !== PostType.CANDIDATE) {
-      throw new ForbiddenException(`Candidates can only create candidate posts. You tried to create a ${postType} post.`);
+      throw new ForbiddenException(`Candidates can only create candidate or general posts. You tried to create a ${postType} post.`);
     }
     
     // Employers can only post employer type
     if (user.userType === 'employer' && postType !== PostType.EMPLOYER) {
-      throw new ForbiddenException(`Employers can only create employer posts. You tried to create a ${postType} post.`);
+      throw new ForbiddenException(`Employers can only create employer or general posts. You tried to create a ${postType} post.`);
     }
     
     return true;

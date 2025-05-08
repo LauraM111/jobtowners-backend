@@ -18,9 +18,11 @@ import { CommunityPost } from './community-post.entity';
   updatedAt: false // This tells Sequelize not to use updatedAt
 })
 export class PostLike extends Model {
-  @PrimaryKey
-  @Default(DataType.UUIDV4)
-  @Column(DataType.UUID)
+  @Column({
+    type: DataType.UUID,
+    defaultValue: DataType.UUIDV4,
+    primaryKey: true,
+  })
   id: string;
 
   @ForeignKey(() => CommunityPost)
@@ -30,15 +32,15 @@ export class PostLike extends Model {
   })
   postId: string;
 
-  @BelongsTo(() => CommunityPost)
-  post: CommunityPost;
-
   @ForeignKey(() => User)
   @Column({
     type: DataType.UUID,
     allowNull: false,
   })
   userId: string;
+
+  @BelongsTo(() => CommunityPost)
+  post: CommunityPost;
 
   @BelongsTo(() => User)
   user: User;

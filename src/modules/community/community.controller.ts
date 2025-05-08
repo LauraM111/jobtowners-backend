@@ -11,6 +11,7 @@ import {
   HttpCode,
   HttpStatus,
   UnauthorizedException,
+  ForbiddenException,
   Req,
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiParam, ApiQuery } from '@nestjs/swagger';
@@ -36,20 +37,39 @@ export class CommunityController {
   @UseGuards(JwtAuthGuard)
   @ApiOperation({ summary: 'Create a new post' })
   @ApiResponse({ status: 201, description: 'Post created successfully' })
-  @ApiResponse({ status: 401, description: 'Unauthorized' })
+  @ApiResponse({ status: 403, description: 'Forbidden - User type not allowed to create this post type' })
   async createPost(
     @Body() createPostDto: CreatePostDto, 
     @User() user: any,
     @Req() request: Request
   ) {
-    console.log('Request headers:', request.headers);
-    console.log('User from request:', user);
+    console.log('User from decorator:', user);
+    console.log('Request user:', request.user);
+    console.log('Auth header:', request.headers.authorization);
     
     if (!user) {
-      throw new UnauthorizedException('User not authenticated. Please login.');
+      throw new ForbiddenException('User information not available. Please check your authentication.');
     }
     
-    return this.communityService.createPost(createPostDto, user);
+    try {
+      // Check post type permissions before sending to service
+      if (createPostDto.postType === PostType.EMPLOYER && user.userType !== 'employer') {
+        throw new ForbiddenException('Only employers can create employer posts. You can create general posts instead.');
+      }
+      
+      if (createPostDto.postType === PostType.CANDIDATE && user.userType !== 'candidate') {
+        throw new ForbiddenException('Only candidates can create candidate posts. You can create general posts instead.');
+      }
+      
+      // All user types can create general posts
+      return await this.communityService.createPost(createPostDto, user);
+    } catch (error) {
+      console.error('Error in createPost:', error);
+      if (error.status === 403) {
+        throw new ForbiddenException(error.message || 'You are not authorized to create this type of post.');
+      }
+      throw error;
+    }
   }
 
   @Public()
@@ -77,8 +97,10 @@ export class CommunityController {
   @ApiParam({ name: 'id', description: 'Post ID' })
   @ApiResponse({ status: 200, description: 'Returns the post' })
   @ApiResponse({ status: 404, description: 'Post not found' })
-  async getPostById(@Param('id') id: string) {
-    return this.communityService.getPostById(id);
+  async getPostById(@Param('id') id: string, @Req() request: Request) {
+    // Check if user is authenticated
+    const user = request.user;
+    return this.communityService.getPostById(id, user);
   }
 
   @Patch('posts/:id')
@@ -105,6 +127,7 @@ export class CommunityController {
 
   // Comment Endpoints
   @Post('posts/:id/comments')
+  @UseGuards(JwtAuthGuard)
   @ApiOperation({ summary: 'Add a comment to a post' })
   @ApiParam({ name: 'id', description: 'Post ID' })
   @ApiResponse({ status: 201, description: 'Comment added successfully' })
@@ -147,6 +170,7 @@ export class CommunityController {
 
   // Like Endpoints
   @Post('posts/:id/like')
+  @UseGuards(JwtAuthGuard)
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Like a post' })
   @ApiParam({ name: 'id', description: 'Post ID' })
@@ -157,6 +181,7 @@ export class CommunityController {
   }
 
   @Delete('posts/:id/like')
+  @UseGuards(JwtAuthGuard)
   @ApiOperation({ summary: 'Unlike a post' })
   @ApiParam({ name: 'id', description: 'Post ID' })
   @ApiResponse({ status: 200, description: 'Post unliked successfully' })
