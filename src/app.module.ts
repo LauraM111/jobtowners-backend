@@ -26,6 +26,7 @@ import { MessagingModule } from './modules/messaging/messaging.module';
 import { ContactModule } from './modules/contact/contact.module';
 import { CommunityModule } from './modules/community/community.module';
 import { PaymentController } from './modules/payment/payment.controller';
+import { StatsModule } from './modules/stats/stats.module';
 
 // Import entities from their correct locations
 import { User } from './modules/user/entities/user.entity';
@@ -103,6 +104,7 @@ import { ApplicationLimit } from './modules/candidate-payment/entities/applicati
     MessagingModule,
     ContactModule,
     CommunityModule,
+    StatsModule,
   ],
   controllers: [
     AppController,
