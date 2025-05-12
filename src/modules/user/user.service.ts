@@ -77,36 +77,31 @@ export class UserService {
         throw new BadRequestException('You must accept the terms to register');
       }
 
-      // Upload images to DigitalOcean Spaces
-      let studentPermitUrl = '';
-      let enrollmentProofUrl = '';
-      
+      // Initialize variables outside the try block so they're accessible in the create call
+      let studentPermitUrl = null;
+      let enrollmentProofUrl = null;
+
+      // Handle optional images
       try {
-        // Check if the image is already a URL
-        if (registrationDto.studentPermitImage.startsWith('http')) {
-          studentPermitUrl = registrationDto.studentPermitImage;
-        } else {
-          // Try to upload as base64
+        // Check if studentPermitImage exists before processing
+        if (registrationDto.studentPermitImage) {
           studentPermitUrl = await this.uploadService.uploadBase64File(
             registrationDto.studentPermitImage,
-            'documents',
+            'student-permits',
             'jpg'
           );
         }
         
-        if (registrationDto.proofOfEnrollmentImage.startsWith('http')) {
-          enrollmentProofUrl = registrationDto.proofOfEnrollmentImage;
-        } else {
-          // Try to upload as base64
+        // Check if proofOfEnrollmentImage exists before processing
+        if (registrationDto.proofOfEnrollmentImage) {
           enrollmentProofUrl = await this.uploadService.uploadBase64File(
             registrationDto.proofOfEnrollmentImage,
-            'documents',
+            'enrollment-proofs',
             'jpg'
           );
         }
       } catch (error) {
-        this.logger.error(`Error uploading images: ${error.message}`, error.stack);
-        throw new BadRequestException('Failed to upload images: ' + error.message);
+        throw new BadRequestException(`Failed to upload images: ${error.message}`);
       }
 
       // Create new user

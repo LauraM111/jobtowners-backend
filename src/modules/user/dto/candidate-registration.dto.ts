@@ -37,15 +37,15 @@ export class CandidateRegistrationDto {
   @IsNotEmpty()
   termsAccepted: boolean;
 
-  @ApiProperty({ example: 'base64-encoded-image', description: 'Student permit image (base64)' })
+  @ApiPropertyOptional({ example: 'base64-encoded-image', description: 'Student permit image (base64)' })
   @IsString()
-  @IsNotEmpty()
-  studentPermitImage: string;
+  @IsOptional()
+  studentPermitImage?: string;
 
-  @ApiProperty({ example: 'base64-encoded-image', description: 'Proof of enrollment image (base64)' })
+  @ApiPropertyOptional({ example: 'base64-encoded-image', description: 'Proof of enrollment image (base64)' })
   @IsString()
-  @IsNotEmpty()
-  proofOfEnrollmentImage: string;
+  @IsOptional()
+  proofOfEnrollmentImage?: string;
 
   @ApiProperty({ example: 'candidate', description: 'User type', required: false })
   @IsString()
