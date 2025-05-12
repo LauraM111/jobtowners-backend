@@ -20,6 +20,7 @@ export class EmployerRegistrationDto {
   @ApiProperty({ example: '+1234567890', description: 'Phone number' })
   @IsNotEmpty()
   @IsString()
+  @IsOptional()
   phoneNumber: string;
 
   @ApiProperty({ example: 'Password123!', description: 'Password' })
