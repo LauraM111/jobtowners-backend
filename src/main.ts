@@ -54,7 +54,7 @@ async function bootstrap() {
     // Enable CORS with more detailed configuration
     app.enableCors({
       origin: process.env.NODE_ENV === 'production'
-        ? ['https://your-production-domain.com','https://www.jobtowners.com','https://jobtowners.com','admin.jobtowners.com','https://admin.jobtowners.com',"https://www.admin.jobtowners.com"]
+        ? ['https://your-production-domain.com','https://www.jobtowners.com', 'www.jobtowners.com/','https://jobtowners.com','admin.jobtowners.com','https://admin.jobtowners.com',"https://www.admin.jobtowners.com"]
         : ['http://localhost:3000','localhost:3000', 'localhost:5173','http://localhost:5173','https://jobtowners.com','https://jobtowners.com','https://admin.jobtowners.com','https://admin.jobtowners.com'], // Correct dev URL
       credentials: true,
       methods: 'GET,HEAD,PUT,PATCH,POST,DELETE,OPTIONS',
