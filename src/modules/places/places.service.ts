@@ -15,7 +15,6 @@ export class PlacesService {
     private httpService: HttpService,
     private configService: ConfigService
   ) {
-    
     // Use a hardcoded API key temporarily for testing
     // Replace this with your new properly configured API key
     this.apiKey = process.env.GOOGLE_PLACES_API_KEY; // Replace with a new API key that has Places API enabled
