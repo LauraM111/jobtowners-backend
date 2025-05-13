@@ -62,10 +62,30 @@ export class JobController {
     @UploadedFile() attachment: Express.Multer.File
   ) {
     try {
+      // Parse numeric values from form data
+      if (createJobDto.latitude && typeof createJobDto.latitude === 'string') {
+        createJobDto.latitude = parseFloat(createJobDto.latitude);
+      }
+      
+      if (createJobDto.longitude && typeof createJobDto.longitude === 'string') {
+        createJobDto.longitude = parseFloat(createJobDto.longitude);
+      }
+      
+      // Log the location data for debugging
+      this.logger.log(`Creating job with location data: 
+        Country: ${createJobDto.country || 'Not provided'},
+        State: ${createJobDto.state || 'Not provided'},
+        City: ${createJobDto.city || 'Not provided'},
+        Postal Code: ${createJobDto.postalCode || 'Not provided'},
+        Latitude: ${createJobDto.latitude || 'Not provided'},
+        Longitude: ${createJobDto.longitude || 'Not provided'}
+      `);
+      
       const attachmentUrl = attachment ? `/uploads/jobs/${attachment.filename}` : null;
       const job = await this.jobService.create(req.user.sub, createJobDto, attachmentUrl);
       return successResponse(job, 'Job created successfully');
     } catch (error) {
+      this.logger.error(`Error creating job: ${error.message}`, error.stack);
       throw new BadRequestException(error.message);
     }
   }
@@ -290,7 +310,8 @@ export class JobController {
         'jobTitle', 'title', 'jobDescription', 'emailAddress', 'specialisms',
         'category', 'jobType', 'offeredSalary', 'careerLevel', 'experience',
         'gender', 'industry', 'qualification', 'applicationDeadlineDate',
-        'country', 'city', 'completeAddress', 'status', 'additionalAttachments',
+        'country', 'city', 'state', 'latitude', 'longitude', 'postalCode',
+        'completeAddress', 'status', 'additionalAttachments',
         'companyId'
       ];
       
@@ -304,27 +325,41 @@ export class JobController {
         }
       }
       
-      // Special handling for additionalAttachments if it's a string
+      // Parse numeric values
+      if (cleanUpdateDto.latitude && typeof cleanUpdateDto.latitude === 'string') {
+        cleanUpdateDto.latitude = parseFloat(cleanUpdateDto.latitude);
+      }
+      
+      if (cleanUpdateDto.longitude && typeof cleanUpdateDto.longitude === 'string') {
+        cleanUpdateDto.longitude = parseFloat(cleanUpdateDto.longitude);
+      }
+      
+      // Special handling for JSON fields
       if (typeof cleanUpdateDto.additionalAttachments === 'string') {
         try {
           cleanUpdateDto.additionalAttachments = JSON.parse(cleanUpdateDto.additionalAttachments);
         } catch (e) {
-          // If it's not valid JSON, keep it as is
           console.log('Could not parse additionalAttachments as JSON:', e);
         }
       }
       
-      // Special handling for specialisms if it's a string
       if (typeof cleanUpdateDto.specialisms === 'string') {
         try {
           cleanUpdateDto.specialisms = JSON.parse(cleanUpdateDto.specialisms);
         } catch (e) {
-          // If it's not valid JSON, keep it as is
           console.log('Could not parse specialisms as JSON:', e);
         }
       }
       
-      console.log('Clean update DTO:', cleanUpdateDto);
+      // Log the location data for debugging
+      this.logger.log(`Updating job with location data: 
+        Country: ${cleanUpdateDto.country || 'Not updated'},
+        State: ${cleanUpdateDto.state || 'Not updated'},
+        City: ${cleanUpdateDto.city || 'Not updated'},
+        Postal Code: ${cleanUpdateDto.postalCode || 'Not updated'},
+        Latitude: ${cleanUpdateDto.latitude || 'Not updated'},
+        Longitude: ${cleanUpdateDto.longitude || 'Not updated'}
+      `);
       
       const attachmentUrl = attachment ? `/uploads/jobs/${attachment.filename}` : null;
       const job = await this.jobService.update(id, req.user.sub, cleanUpdateDto, attachmentUrl);

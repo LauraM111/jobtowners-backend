@@ -86,6 +86,24 @@ export class CreateJobDto {
   @IsOptional()
   city?: string;
 
+  @ApiPropertyOptional({ description: 'State', example: 'NY' })
+  @IsString()
+  @IsOptional()
+  state?: string;
+
+  @ApiPropertyOptional({ description: 'Latitude', example: 40.7128 })
+  @IsOptional()
+  latitude?: number;
+
+  @ApiPropertyOptional({ description: 'Longitude', example: -74.0060 })
+  @IsOptional()
+  longitude?: number;
+
+  @ApiPropertyOptional({ description: 'Postal Code', example: '10001' })
+  @IsString()
+  @IsOptional()
+  postalCode?: string;
+
   @ApiPropertyOptional({ description: 'Complete address', example: '123 Main St, New York, NY 10001' })
   @IsString()
   @IsOptional()

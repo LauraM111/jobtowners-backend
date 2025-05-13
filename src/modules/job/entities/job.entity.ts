@@ -169,6 +169,30 @@ export class Job extends Model {
   city: string;
 
   @Column({
+    type: DataType.STRING,
+    allowNull: true
+  })
+  state: string;
+
+  @Column({
+    type: DataType.FLOAT,
+    allowNull: true
+  })
+  latitude: number;
+
+  @Column({
+    type: DataType.FLOAT,
+    allowNull: true
+  })
+  longitude: number;
+
+  @Column({
+    type: DataType.STRING,
+    allowNull: true
+  })
+  postalCode: string;
+
+  @Column({
     type: DataType.TEXT,
     allowNull: true
   })
