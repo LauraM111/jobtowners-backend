@@ -114,8 +114,13 @@ export class JobService {
       category,
       experience,
       careerLevel,
+      location,
+      latitude,
+      longitude,
+      radius = 25, // Default radius is 25 miles
       sort,
-      currentUserId 
+      currentUserId,
+      debug = false
     } = query;
     
     // Build where clause
@@ -178,19 +183,87 @@ export class JobService {
       ];
     }
     
-    // For debugging
-    this.logger.log(`Filtering jobs with parameters: 
-      Status: ${status || 'Not filtered'}
-      Career Level: ${careerLevel || 'Not filtered'}
-      Job Type: ${jobType || 'Not filtered'}
-      Category: ${category || 'Not filtered'}
-      Experience: ${experience || 'Not filtered'}
-      Sort: ${sort || 'Default (createdAt:DESC)'}
-    `);
+    // Handle location-based search
+    if (location) {
+      this.logger.log(`Searching for jobs with location: ${location}`);
+      
+      // Extract potential parts from the location string
+      const locationParts = location.split(',').map(part => part.trim());
+      
+      // Create a more flexible search pattern
+      const searchPattern = `%${locationParts.join('%')}%`;
+      this.logger.log(`Using search pattern: ${searchPattern}`);
+      
+      // Create a simpler OR condition that's more likely to match
+      const locationConditions = [
+        { completeAddress: { [Op.like]: searchPattern } },
+        { city: { [Op.like]: `%${locationParts[0]}%` } }, // First part is usually city
+        { state: { [Op.like]: `%${locationParts[1] || ''}%` } }, // Second part is usually state
+        { country: { [Op.like]: `%${locationParts[2] || ''}%` } } // Third part is usually country
+      ];
+      
+      // For each individual part, also search in all location fields
+      for (const part of locationParts) {
+        if (part && part.length > 2) { // Only search for parts with at least 3 characters
+          locationConditions.push(
+            { completeAddress: { [Op.like]: `%${part}%` } },
+            { city: { [Op.like]: `%${part}%` } },
+            { state: { [Op.like]: `%${part}%` } },
+            { country: { [Op.like]: `%${part}%` } }
+          );
+        }
+      }
+      
+      // Combine with existing OR conditions if they exist
+      if (where[Op.or]) {
+        where[Op.and] = where[Op.and] || [];
+        where[Op.and].push({ [Op.or]: locationConditions });
+      } else {
+        where[Op.or] = locationConditions;
+      }
+      
+      // Log the where clause for debugging
+      this.logger.log(`Location search where clause: ${JSON.stringify(where)}`);
+    }
     
-    this.logger.log(`Where clause: ${JSON.stringify(where)}`);
+    // If debug mode is enabled, log additional information
+    if (debug) {
+      // Skip verification status check in debug mode
+      if (where.verificationStatus) {
+        delete where.verificationStatus;
+        this.logger.log('Debug mode: Ignoring verification status filter');
+      }
+      
+      // Log all jobs in the database with their location info
+      const allJobs = await this.jobModel.findAll({
+        attributes: ['id', 'jobTitle', 'city', 'state', 'country', 'completeAddress', 'latitude', 'longitude', 'status', 'verificationStatus'],
+        limit: 20
+      });
+      
+      this.logger.log('Debug mode: All jobs in database:');
+      allJobs.forEach(job => {
+        this.logger.log(`Job ${job.id}: ${job.jobTitle} - City: ${job.city}, State: ${job.state}, Country: ${job.country}, Address: ${job.completeAddress}, Status: ${job.status}, Verification: ${job.verificationStatus}`);
+      });
+    }
     
-    // Get total count for pagination
+    // For debugging purposes, if verificationStatus is 'approved' but no jobs are found,
+    // also include 'pending' jobs
+    if (verificationStatus === 'approved') {
+      const approvedCount = await this.jobModel.count({ 
+        where: { ...where, verificationStatus: 'approved' } 
+      });
+      
+      if (approvedCount === 0) {
+        this.logger.log('No approved jobs found, including pending jobs for debugging');
+        where.verificationStatus = { [Op.in]: ['approved', 'pending'] };
+      } else {
+        where.verificationStatus = verificationStatus;
+      }
+    } else if (verificationStatus) {
+      where.verificationStatus = verificationStatus;
+    }
+    
+    // Get total count for pagination (without distance filtering)
     const total = await this.jobModel.count({ where: where });
     
     // Handle sorting
@@ -202,19 +275,6 @@ export class JobService {
       }
     }
     
-    // Get user attributes safely
-    let userAttributes = ['id', 'firstName', 'lastName', 'email'];
-    
-    try {
-      // Check if companyName exists in the User model
-      const userModel = this.userModel;
-      if (userModel.rawAttributes.companyName) {
-        userAttributes.push('companyName');
-      }
-    } catch (error) {
-      this.logger.warn('companyName attribute not found in User model');
-    }
-    
     // Get jobs with pagination
     const options: any = {
       where: where,
@@ -222,7 +282,7 @@ export class JobService {
       include: [
         {
           model: User,
-          attributes: userAttributes
+          attributes: ['id', 'firstName', 'lastName', 'email']
         },
         {
           model: Company,
@@ -230,6 +290,46 @@ export class JobService {
         }
       ]
     };
+    
+    // Handle coordinate-based search with radius
+    if (latitude && longitude) {
+      this.logger.log(`Searching jobs within ${radius} miles of coordinates: ${latitude}, ${longitude}`);
+      
+      // Convert miles to kilometers (1 mile = 1.60934 km)
+      const radiusInKm = radius * 1.60934;
+      
+      // We need to make sure we include all columns from the Job model
+      options.attributes = options.attributes || {};
+      options.attributes.include = options.attributes.include || [];
+      
+      // Add distance calculation using Haversine formula with fully qualified column names
+      options.attributes.include.push([
+        Sequelize.literal(`
+          IF(\`Job\`.latitude IS NOT NULL AND \`Job\`.longitude IS NOT NULL,
+            (
+              6371 * acos(
+                least(1.0, cos(radians(${latitude})) 
+                * cos(radians(\`Job\`.latitude)) 
+                * cos(radians(\`Job\`.longitude) - radians(${longitude})) 
+                + sin(radians(${latitude})) 
+                * sin(radians(\`Job\`.latitude)))
+              )
+            ),
+            NULL
+          )
+        `),
+        'distance'
+      ]);
+      
+      // Add a raw attribute to help with debugging - use fully qualified column names
+      options.attributes.include.push([
+        Sequelize.literal(`CONCAT(\`Job\`.latitude, ',', \`Job\`.longitude)`),
+        'coordinates'
+      ]);
+      
+      // Log the SQL query for debugging
+      options.logging = (sql) => this.logger.log(`SQL Query: ${sql}`);
+    }
     
     // Add pagination if provided and valid
     if (limit !== undefined && limit !== null) {
@@ -246,7 +346,47 @@ export class JobService {
       }
     }
     
-    const jobs = await this.jobModel.findAll(options);
+    let jobs = await this.jobModel.findAll(options);
+    
+    // If we're doing coordinate-based search, filter by distance in the application
+    if (latitude && longitude && jobs.length > 0) {
+      const radiusInKm = radius * 1.60934;
+      
+      this.logger.log(`Found ${jobs.length} jobs before distance filtering`);
+      
+      // Log all jobs with their distances for debugging
+      jobs.forEach(job => {
+        const distance = job.get('distance');
+        const coords = job.get('coordinates');
+        this.logger.log(`Job ${job.id}: distance=${distance}, coordinates=${coords}`);
+      });
+      
+      // Filter jobs by distance
+      const filteredJobs = jobs.filter(job => {
+        const distance = job.get('distance');
+        return distance === null || (distance as number) <= radiusInKm;
+      });
+      
+      this.logger.log(`Found ${filteredJobs.length} jobs after distance filtering`);
+      
+      // Sort by distance (null distances at the end)
+      filteredJobs.sort((a, b) => {
+        const distA = a.get('distance') as number | null;
+        const distB = b.get('distance') as number | null;
+        
+        if (distA === null && distB === null) return 0;
+        if (distA === null) return 1;
+        if (distB === null) return -1;
+        return distA - distB;
+      });
+      
+      // Apply limit after filtering
+      if (options.limit) {
+        jobs = filteredJobs.slice(0, options.limit);
+      } else {
+        jobs = filteredJobs;
+      }
+    }
     
     // If currentUserId is provided, check if the user has applied for each job
     if (currentUserId) {

@@ -1,8 +1,8 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { HttpService } from '@nestjs/axios';
 import { ConfigService } from '@nestjs/config';
-import { map, catchError } from 'rxjs/operators';
-import { Observable, throwError } from 'rxjs';
+import { map, catchError, switchMap } from 'rxjs/operators';
+import { Observable, throwError, of, forkJoin } from 'rxjs';
 import { AxiosResponse } from 'axios';
 
 @Injectable()
@@ -137,6 +137,82 @@ export class PlacesService {
       }),
       catchError(error => {
         this.logger.error(`Error geocoding address: ${error.message}`);
+        return throwError(() => error);
+      })
+    );
+  }
+
+  /**
+   * Get location suggestions (cities, states, countries) based on input text
+   * with latitude and longitude coordinates
+   */
+  getLocationSuggestions(input: string, sessionToken?: string): Observable<any> {
+    const url = `${this.baseUrl}/autocomplete/json`;
+    
+    return this.httpService.get(url, {
+      params: {
+        input,
+        key: this.apiKey,
+        sessiontoken: sessionToken,
+        types: '(regions)', // This restricts results to regions (cities, states, countries)
+        language: 'en' // Ensures results are in English
+      }
+    }).pipe(
+      switchMap((response: AxiosResponse) => {
+        this.logger.log(`Location suggestions API response status: ${response.data.status}`);
+        
+        if (response.data.status !== 'OK' || !response.data.predictions || response.data.predictions.length === 0) {
+          this.logger.error(`Places API error: ${response.data.error_message || 'Unknown error'}`);
+          return of({ suggestions: [] });
+        }
+        
+        // Get the top 5 predictions to avoid too many API calls
+        const topPredictions = response.data.predictions.slice(0, 5);
+        
+        // Create an array of observables for each place details request
+        const detailsRequests = topPredictions.map(prediction => 
+          this.getPlaceDetails(prediction.place_id, sessionToken).pipe(
+            map(details => {
+              return {
+                place_id: prediction.place_id,
+                description: prediction.description,
+                structured_formatting: prediction.structured_formatting,
+                terms: prediction.terms,
+                formatted_suggestion: prediction.description,
+                // Add coordinates from the details response
+                latitude: details.latitude || null,
+                longitude: details.longitude || null
+              };
+            }),
+            catchError(error => {
+              this.logger.error(`Error fetching details for place ${prediction.place_id}: ${error.message}`);
+              // Return the prediction without coordinates if there's an error
+              return of({
+                place_id: prediction.place_id,
+                description: prediction.description,
+                structured_formatting: prediction.structured_formatting,
+                terms: prediction.terms,
+                formatted_suggestion: prediction.description,
+                latitude: null,
+                longitude: null
+              });
+            })
+          )
+        );
+        
+        // Combine all the details requests
+        return forkJoin(detailsRequests).pipe(
+          map(suggestionsWithCoordinates => {
+            return { suggestions: suggestionsWithCoordinates };
+          }),
+          catchError(error => {
+            this.logger.error(`Error processing location suggestions: ${error.message}`);
+            return of({ suggestions: [] });
+          })
+        );
+      }),
+      catchError(error => {
+        this.logger.error(`Error fetching location suggestions: ${error.message}`);
         return throwError(() => error);
       })
     );

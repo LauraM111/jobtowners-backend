@@ -136,7 +136,12 @@ export class JobController {
   @ApiQuery({ name: 'category', required: false })
   @ApiQuery({ name: 'experience', required: false })
   @ApiQuery({ name: 'careerLevel', required: false, description: 'Filter by career level' })
+  @ApiQuery({ name: 'location', required: false, description: 'Filter by location name (city, country, etc.)' })
+  @ApiQuery({ name: 'latitude', required: false, type: Number, description: 'Latitude for location-based search' })
+  @ApiQuery({ name: 'longitude', required: false, type: Number, description: 'Longitude for location-based search' })
+  @ApiQuery({ name: 'radius', required: false, type: Number, description: 'Search radius in miles (default: 25)' })
   @ApiQuery({ name: 'sort', required: false, description: 'Sort field:direction (e.g. createdAt:desc)' })
+  @ApiQuery({ name: 'debug', required: false, type: Boolean, description: 'Enable debug mode' })
   async findAll(
     @Query('limit') limit?: number,
     @Query('offset') offset?: number,
@@ -150,7 +155,12 @@ export class JobController {
     @Query('category') category?: string,
     @Query('experience') experience?: string,
     @Query('careerLevel') careerLevel?: string,
+    @Query('location') location?: string,
+    @Query('latitude') latitude?: number,
+    @Query('longitude') longitude?: number,
+    @Query('radius') radius?: number,
     @Query('sort') sort?: string,
+    @Query('debug') debug?: string | boolean,
     @Request() req?: any,
   ) {
     // Extract token from Authorization header
@@ -183,8 +193,13 @@ export class JobController {
       category,
       experience,
       careerLevel,
+      location,
+      latitude,
+      longitude,
+      radius: radius || 25, // Default radius is 25 miles
       sort,
-      currentUserId
+      currentUserId,
+      debug: debug === true || debug === 'true' || debug === '1',
     });
     
     return successResponse({ jobs, total }, 'Jobs retrieved successfully');
@@ -559,5 +574,27 @@ export class JobController {
   async getJobCountsByType() {
     const counts = await this.jobService.getJobCountsByType();
     return successResponse(counts, 'Job counts retrieved successfully');
+  }
+
+  @Get('debug/locations')
+  @Public()
+  @ApiOperation({ summary: 'Debug endpoint to list all job locations' })
+  async debugLocations() {
+    const jobs = await this.jobService.findAll({
+      limit: 100,
+      status: 'active'
+    });
+    
+    // Extract location data for debugging
+    const locationData = jobs.jobs.map(job => ({
+      id: job.id,
+      city: job.city,
+      state: job.state,
+      country: job.country,
+      completeAddress: job.completeAddress,
+      coordinates: job.latitude && job.longitude ? `${job.latitude},${job.longitude}` : null
+    }));
+    
+    return successResponse(locationData, 'Job location data retrieved');
   }
 } 

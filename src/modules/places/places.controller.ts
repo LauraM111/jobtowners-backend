@@ -76,4 +76,27 @@ export class PlacesController {
       throw new BadRequestException('Failed to geocode address');
     }
   }
+
+  @Get('autocomplete/location-suggestions')
+  @Public()
+  @ApiOperation({ summary: 'Get location suggestions based on input text' })
+  @ApiQuery({ name: 'input', required: true, description: 'The location text to search for (city, state, country, etc.)' })
+  @ApiQuery({ name: 'sessionToken', required: false, description: 'A session token for billing purposes' })
+  @ApiResponse({ status: 200, description: 'Location suggestions retrieved successfully' })
+  async getLocationSuggestions(
+    @Query('input') input: string,
+    @Query('sessionToken') sessionToken?: string
+  ) {
+    if (!input || input.trim().length < 2) {
+      throw new BadRequestException('Input must be at least 2 characters');
+    }
+
+    try {
+      const suggestions = await lastValueFrom(this.placesService.getLocationSuggestions(input, sessionToken));
+      return successResponse(suggestions, 'Location suggestions retrieved successfully');
+    } catch (error) {
+      this.logger.error(`Error in getLocationSuggestions: ${error.message}`);
+      throw new BadRequestException('Failed to get location suggestions');
+    }
+  }
 } 
