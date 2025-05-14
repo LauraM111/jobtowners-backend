@@ -109,7 +109,12 @@ export class JobService {
       userId, 
       companyId, 
       search,
+      query: searchQuery,
       jobType,
+      category,
+      experience,
+      careerLevel,
+      sort,
       currentUserId 
     } = query;
     
@@ -132,10 +137,30 @@ export class JobService {
       where.companyId = companyId;
     }
     
+    // Handle multiple job types (comma-separated)
     if (jobType) {
-      where.jobType = jobType;
+      if (jobType.includes(',')) {
+        const jobTypes = jobType.split(',');
+        where.jobType = { [Op.in]: jobTypes };
+      } else {
+        where.jobType = jobType;
+      }
     }
     
+    if (category) {
+      where.category = category;
+    }
+    
+    if (experience) {
+      where.experience = experience;
+    }
+    
+    // Add careerLevel filter
+    if (careerLevel) {
+      where.careerLevel = careerLevel;
+    }
+    
+    // Handle search parameter (existing functionality)
     if (search) {
       where[Op.or] = [
         { title: { [Op.like]: `%${search}%` } },
@@ -144,8 +169,38 @@ export class JobService {
       ];
     }
     
+    // Handle query parameter (new functionality)
+    if (searchQuery) {
+      where[Op.or] = [
+        { title: { [Op.like]: `%${searchQuery}%` } },
+        { jobTitle: { [Op.like]: `%${searchQuery}%` } },
+        { jobDescription: { [Op.like]: `%${searchQuery}%` } }
+      ];
+    }
+    
+    // For debugging
+    this.logger.log(`Filtering jobs with parameters: 
+      Status: ${status || 'Not filtered'}
+      Career Level: ${careerLevel || 'Not filtered'}
+      Job Type: ${jobType || 'Not filtered'}
+      Category: ${category || 'Not filtered'}
+      Experience: ${experience || 'Not filtered'}
+      Sort: ${sort || 'Default (createdAt:DESC)'}
+    `);
+    
+    this.logger.log(`Where clause: ${JSON.stringify(where)}`);
+    
     // Get total count for pagination
     const total = await this.jobModel.count({ where: where });
+    
+    // Handle sorting
+    let orderClause = [['createdAt', 'DESC']]; // Default sorting
+    if (sort) {
+      const [field, direction] = sort.split(':');
+      if (field && (direction === 'asc' || direction === 'desc')) {
+        orderClause = [[field, direction.toUpperCase()]];
+      }
+    }
     
     // Get user attributes safely
     let userAttributes = ['id', 'firstName', 'lastName', 'email'];
@@ -163,7 +218,7 @@ export class JobService {
     // Get jobs with pagination
     const options: any = {
       where: where,
-      order: [['createdAt', 'DESC']],
+      order: orderClause,
       include: [
         {
           model: User,

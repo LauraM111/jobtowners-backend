@@ -131,6 +131,12 @@ export class JobController {
   @ApiQuery({ name: 'userId', required: false })
   @ApiQuery({ name: 'companyId', required: false })
   @ApiQuery({ name: 'search', required: false })
+  @ApiQuery({ name: 'query', required: false, description: 'Search in jobTitle, title, and jobDescription' })
+  @ApiQuery({ name: 'jobType', required: false, enum: JobType })
+  @ApiQuery({ name: 'category', required: false })
+  @ApiQuery({ name: 'experience', required: false })
+  @ApiQuery({ name: 'careerLevel', required: false, description: 'Filter by career level' })
+  @ApiQuery({ name: 'sort', required: false, description: 'Sort field:direction (e.g. createdAt:desc)' })
   async findAll(
     @Query('limit') limit?: number,
     @Query('offset') offset?: number,
@@ -139,6 +145,12 @@ export class JobController {
     @Query('userId') userId?: string,
     @Query('companyId') companyId?: string,
     @Query('search') search?: string,
+    @Query('query') query?: string,
+    @Query('jobType') jobType?: JobType,
+    @Query('category') category?: string,
+    @Query('experience') experience?: string,
+    @Query('careerLevel') careerLevel?: string,
+    @Query('sort') sort?: string,
     @Request() req?: any,
   ) {
     // Extract token from Authorization header
@@ -166,6 +178,12 @@ export class JobController {
       userId,
       companyId,
       search,
+      query,
+      jobType,
+      category,
+      experience,
+      careerLevel,
+      sort,
       currentUserId
     });
     
