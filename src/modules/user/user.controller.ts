@@ -24,6 +24,7 @@ import {
   UsePipes,
   ValidationPipe,
   UnauthorizedException,
+  ForbiddenException,
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiParam, ApiBearerAuth } from '@nestjs/swagger';
 import { UserService } from './user.service';
@@ -46,6 +47,8 @@ import { AdminUpdateUserDto } from './dto/admin-update-user.dto';
 import { Request as ExpressRequest } from 'express';
 import * as bcrypt from 'bcrypt';
 import { QueryTypes } from 'sequelize';
+import { UpdateCandidateProfileDto } from './dto/update-candidate-profile.dto';
+import { UpdateEmployerProfileDto } from './dto/update-employer-profile.dto';
 
 interface RequestWithUser extends ExpressRequest {
   user: {
@@ -562,19 +565,80 @@ export class UserController {
     }
   }
 
-  // Helper method to sanitize user data
-  private sanitizeUser(user: any) {
-    return {
-      id: user.id,
-      email: user.email,
-      firstName: user.firstName,
-      lastName: user.lastName,
-      phoneNumber: user.phoneNumber,
-      userType: user.userType,
-      status: user.status,
-      isEmailVerified: user.isEmailVerified,
-      companyName: user.companyName,
-      createdAt: user.createdAt
-    };
+  @Patch('candidate/update/profile')
+  @UseGuards(JwtAuthGuard)
+  @ApiOperation({ summary: 'Update candidate profile' })
+  @ApiResponse({ status: 200, description: 'Candidate profile updated successfully' })
+  @ApiResponse({ status: 400, description: 'Bad request' })
+  @ApiResponse({ status: 403, description: 'Forbidden - User is not a candidate' })
+  @ApiBearerAuth()
+  async updateCandidateProfile(
+    @Req() req,
+    @Body() updateCandidateProfileDto: UpdateCandidateProfileDto
+  ) {
+    try {
+      const userId = req.user.sub || req.user.userId;
+      const userType = req.user.userType;
+      
+      // Verify user is a candidate
+      if (userType !== UserType.CANDIDATE) {
+        throw new ForbiddenException('Only candidates can update candidate profiles');
+      }
+      
+      // Check if email is being attempted to be updated
+      if ('email' in updateCandidateProfileDto) {
+        throw new BadRequestException('Email cannot be updated through this endpoint');
+      }
+      
+      const updatedUser = await this.userService.updateCandidateProfile(userId, updateCandidateProfileDto);
+      return successResponse(this.sanitizeUser(updatedUser), 'Candidate profile updated successfully');
+    } catch (error) {
+      if (error instanceof BadRequestException || error instanceof ForbiddenException) {
+        throw error;
+      }
+      throw new BadRequestException('Failed to update profile: ' + error.message);
+    }
+  }
+
+  @Patch('employer/update/profile')
+  @UseGuards(JwtAuthGuard)
+  @ApiOperation({ summary: 'Update employer profile' })
+  @ApiResponse({ status: 200, description: 'Employer profile updated successfully' })
+  @ApiResponse({ status: 400, description: 'Bad request' })
+  @ApiResponse({ status: 403, description: 'Forbidden - User is not an employer' })
+  @ApiBearerAuth()
+  async updateEmployerProfile(
+    @Req() req,
+    @Body() updateEmployerProfileDto: UpdateEmployerProfileDto
+  ) {
+    try {
+      const userId = req.user.sub || req.user.userId;
+      const userType = req.user.userType;
+      
+      // Verify user is an employer
+      if (userType !== UserType.EMPLOYER) {
+        throw new ForbiddenException('Only employers can update employer profiles');
+      }
+      
+      // Check if email is being attempted to be updated
+      if ('email' in updateEmployerProfileDto) {
+        throw new BadRequestException('Email cannot be updated through this endpoint');
+      }
+      
+      const updatedUser = await this.userService.updateEmployerProfile(userId, updateEmployerProfileDto);
+      return successResponse(this.sanitizeUser(updatedUser), 'Employer profile updated successfully');
+    } catch (error) {
+      if (error instanceof BadRequestException || error instanceof ForbiddenException) {
+        throw error;
+      }
+      throw new BadRequestException('Failed to update profile: ' + error.message);
+    }
+  }
+
+  // Helper method to sanitize user data before sending response
+  private sanitizeUser(user: any): any {
+    const sanitized = user.toJSON ? user.toJSON() : { ...user };
+    delete sanitized.password;
+    return sanitized;
   }
 } 

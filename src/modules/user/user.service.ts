@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException, ConflictException, BadRequestException, Logger, Inject, forwardRef } from '@nestjs/common';
+import { Injectable, NotFoundException, ConflictException, BadRequestException, Logger, Inject, forwardRef, ForbiddenException } from '@nestjs/common';
 import { InjectModel } from '@nestjs/sequelize';
 import * as bcrypt from 'bcrypt';
 import { User, UserType, UserStatus } from './entities/user.entity';
@@ -18,6 +18,8 @@ import { ResumeService } from '../resume/resume.service';
 import { CompanyService } from '../company/company.service';
 import { UpdateProfileDto } from './dto/update-profile.dto';
 import { Op } from 'sequelize';
+import { UpdateCandidateProfileDto } from './dto/update-candidate-profile.dto';
+import { UpdateEmployerProfileDto } from './dto/update-employer-profile.dto';
 
 @Injectable()
 export class UserService {
@@ -504,5 +506,45 @@ export class UserService {
     
     // This assumes you have a CompanyService injected
     return this.companyService.findByUserId(employerId, {});
+  }
+
+  /**
+   * Update candidate profile
+   */
+  async updateCandidateProfile(userId: string, updateCandidateProfileDto: UpdateCandidateProfileDto): Promise<User> {
+    const user = await this.findById(userId);
+    
+    if (!user) {
+      throw new NotFoundException('User not found');
+    }
+    
+    if (user.userType !== UserType.CANDIDATE) {
+      throw new ForbiddenException('Only candidates can update candidate profiles');
+    }
+    
+    // Update user with provided data
+    await user.update(updateCandidateProfileDto);
+    
+    return this.findById(userId);
+  }
+
+  /**
+   * Update employer profile
+   */
+  async updateEmployerProfile(userId: string, updateEmployerProfileDto: UpdateEmployerProfileDto): Promise<User> {
+    const user = await this.findById(userId);
+    
+    if (!user) {
+      throw new NotFoundException('User not found');
+    }
+    
+    if (user.userType !== UserType.EMPLOYER) {
+      throw new ForbiddenException('Only employers can update employer profiles');
+    }
+    
+    // Update user with provided data
+    await user.update(updateEmployerProfileDto);
+    
+    return this.findById(userId);
   }
 } 
