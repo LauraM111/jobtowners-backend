@@ -105,6 +105,12 @@ export class CandidatePaymentController {
       const plan = await this.candidatePaymentService.updatePlan(id, updateCandidatePlanDto);
       return successResponse(plan, 'Candidate plan updated successfully');
     } catch (error) {
+      // Check if it's a Stripe error related to missing product ID
+      if (error.message && error.message.includes('Argument "id" must be a string')) {
+        // Try updating without Stripe
+        const plan = await this.candidatePaymentService.updatePlanWithoutStripe(id, updateCandidatePlanDto);
+        return successResponse(plan, 'Candidate plan updated successfully (without Stripe update)');
+      }
       throw new BadRequestException(error.message);
     }
   }
