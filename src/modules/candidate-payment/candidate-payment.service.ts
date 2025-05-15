@@ -10,6 +10,7 @@ import { UpdateCandidatePlanDto } from './dto/update-candidate-plan.dto';
 import { User } from '../user/entities/user.entity';
 import Stripe from 'stripe';
 import { CreatePaymentIntentDto } from './dto/create-payment-intent.dto';
+import { Op } from 'sequelize';
 
 @Injectable()
 export class CandidatePaymentService {
@@ -699,7 +700,7 @@ export class CandidatePaymentService {
           lastPayment: null,
           hasPaidPlan: false,
           applicationLimit: {
-            dailyLimit: 15,
+            dailyLimit: 15, // Default limit
             applicationsUsedToday: 0,
             lastResetDate: new Date(),
             hasPaid: false
@@ -725,23 +726,56 @@ export class CandidatePaymentService {
         where: { userId }
       });
 
+      // Find user's active plan to get the dynamic daily limit
+      let dailyLimit = 15; // Default limit
+      
+      // Get the user's active plan if they have one
+      const activePlan = await this.candidateOrderModel.findOne({
+        where: { 
+          userId, 
+          status: 'completed'
+        },
+        order: [['createdAt', 'DESC']],
+        include: [{
+          model: this.candidatePlanModel,
+          as: 'plan'
+        }]
+      });
+
+      // If user has an active plan, use its daily application limit
+      if (activePlan && activePlan.plan) {
+        dailyLimit = activePlan.plan.dailyApplicationLimit || 15;
+      }
+
       if (!applicationLimit) {
         // Create default application limit if it doesn't exist
         applicationLimit = await this.applicationLimitModel.create({
           userId,
-          dailyLimit: 15,
+          dailyLimit: dailyLimit,
           applicationsUsedToday: 0,
           lastResetDate: new Date(),
-          hasPaid: false
+          hasPaid: !!activePlan // Set hasPaid based on whether user has an active plan
         });
+      } else {
+        // Update the daily limit based on the user's current plan
+        if (applicationLimit.dailyLimit !== dailyLimit || applicationLimit.hasPaid !== !!activePlan) {
+          await applicationLimit.update({
+            dailyLimit: dailyLimit,
+            hasPaid: !!activePlan
+          });
+        }
       }
 
       return {
         totalSpent,
         ordersCount: orders.length,
         lastPayment,
-        hasPaidPlan: applicationLimit.hasPaid,
-        applicationLimit
+        hasPaidPlan: !!activePlan,
+        applicationLimit,
+        activePlan: activePlan ? {
+          id: activePlan.id,
+          planName: activePlan.plan ? activePlan.plan.name : null
+        } : null
       };
     } catch (error) {
       this.logger.error(`Error getting payment stats: ${error.message}`);
