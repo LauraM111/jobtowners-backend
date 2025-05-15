@@ -101,7 +101,7 @@ export class CreateResumeDto {
   @ApiPropertyOptional({ description: 'Gender', enum: Gender, example: Gender.MALE })
   @IsOptional()
   @IsEnum(Gender)
-  gender?: Gender;
+  gender?: Gender; 
 
   @ApiPropertyOptional({ description: 'Marital status', example: 'Single' })
   @IsOptional()
