@@ -12,6 +12,7 @@ import { Roles } from '../auth/decorators/roles.decorator';
 import { UserType } from '../user/entities/user.entity';
 import { successResponse } from '../../common/helpers/response.helper';
 import { PlanStatus } from './entities/subscription-plan.entity';
+import { Public } from '../auth/decorators/public.decorator';
 
 @ApiTags('Subscription Plans')
 @Controller('subscription-plans')
@@ -33,8 +34,9 @@ export class SubscriptionPlanController {
     }
   }
 
+  @Public()
   @Get()
-  @ApiOperation({ summary: 'Get all subscription plans' })
+  @ApiOperation({ summary: 'Get all subscription plans (Public access)' })
   @ApiResponse({ status: 200, description: 'Subscription plans retrieved successfully' })
   @ApiQuery({ name: 'status', enum: PlanStatus, required: false })
   @ApiQuery({ name: 'limit', required: false, type: Number })
@@ -44,8 +46,9 @@ export class SubscriptionPlanController {
     return successResponse(subscriptionPlans, 'Subscription plans retrieved successfully');
   }
 
+  @Public()
   @Get(':id')
-  @ApiOperation({ summary: 'Get a subscription plan by ID' })
+  @ApiOperation({ summary: 'Get a subscription plan by ID (Public access)' })
   @ApiResponse({ status: 200, description: 'Subscription plan retrieved successfully' })
   async findOne(@Param('id') id: string) {
     const subscriptionPlan = await this.subscriptionPlanService.findOne(id);
