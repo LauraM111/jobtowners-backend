@@ -60,6 +60,7 @@ export class CandidatePaymentController {
   }
 
   @Get('plans')
+  @Public()
   @ApiOperation({ summary: 'Get all candidate plans' })
   @ApiResponse({ status: 200, description: 'Plans retrieved successfully' })
   @ApiQuery({ name: 'page', required: false, type: Number })
