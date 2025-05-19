@@ -895,7 +895,7 @@ export class JobService {
   }
 
   /**
-   * Get daily application limits for a user
+   * Get daily application limits for a user with dynamic values
    */
   async getDailyApplicationLimits(userId: string): Promise<any> {
     try {
@@ -904,20 +904,73 @@ export class JobService {
         where: { userId }
       });
       
+      // Get the user's active candidate payment plan if they have one
+      const activePlan = await this.sequelize.models.CandidateOrder.findOne({
+        where: { 
+          userId, 
+          status: 'completed'
+        },
+        order: [['createdAt', 'DESC']],
+        include: [{
+          model: this.sequelize.models.CandidatePlan,
+          as: 'plan'
+        }]
+      });
+      
+      // Determine the daily limit based on the user's plan
+      let dailyLimit = 15; // Default limit
+      let hasPaid = false;
+      
+      if (activePlan && activePlan.plan) {
+        // Use the plan's daily application limit if available
+        dailyLimit = Number(activePlan.plan.dailyApplicationLimit) || dailyLimit;
+        hasPaid = true;
+      }
+      
+      // If no application limit record exists, create default values
       if (!applicationLimit) {
-        // If no limit exists, return default values
-        return {
-          dailyLimit: 15, // Default limit
+        // Create a new application limit record for this user
+        await this.sequelize.models.ApplicationLimit.create({
+          userId,
+          dailyLimit,
           applicationsUsedToday: 0,
-          remainingApplications: 15,
           lastResetDate: new Date(),
-          hasPaid: false
+          hasPaid
+        });
+        
+        return {
+          dailyLimit,
+          applicationsUsedToday: 0,
+          remainingApplications: dailyLimit,
+          lastResetDate: new Date(),
+          hasPaid,
+          planName: activePlan?.plan?.name || 'Free Plan'
         };
       }
       
-      // Convert values to numbers before arithmetic operation
-      const dailyLimit = Number(applicationLimit.get('dailyLimit'));
-      const applicationsUsedToday = Number(applicationLimit.get('applicationsUsedToday'));
+      // Check if the limit needs to be reset (new day)
+      const today = new Date();
+      const lastResetDate = new Date(applicationLimit.get('lastResetDate'));
+      
+      let applicationsUsedToday = Number(applicationLimit.get('applicationsUsedToday'));
+      
+      // Reset the counter if it's a new day
+      if (today.toDateString() !== lastResetDate.toDateString()) {
+        applicationsUsedToday = 0;
+        await applicationLimit.update({
+          applicationsUsedToday: 0,
+          lastResetDate: today
+        });
+      }
+      
+      // Update the daily limit and paid status if they've changed
+      if (Number(applicationLimit.get('dailyLimit')) !== dailyLimit || 
+          Boolean(applicationLimit.get('hasPaid')) !== hasPaid) {
+        await applicationLimit.update({
+          dailyLimit,
+          hasPaid
+        });
+      }
       
       // Calculate remaining applications
       const remainingApplications = dailyLimit - applicationsUsedToday;
@@ -927,7 +980,9 @@ export class JobService {
         applicationsUsedToday,
         remainingApplications: remainingApplications > 0 ? remainingApplications : 0,
         lastResetDate: applicationLimit.get('lastResetDate'),
-        hasPaid: applicationLimit.get('hasPaid')
+        hasPaid,
+        planName: activePlan?.plan?.name || 'Free Plan',
+        canApply: remainingApplications > 0 && hasPaid
       };
     } catch (error) {
       this.logger.error(`Error getting application limits: ${error.message}`);
