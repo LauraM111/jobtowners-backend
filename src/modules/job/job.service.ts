@@ -915,12 +915,16 @@ export class JobService {
         };
       }
       
+      // Convert values to numbers before arithmetic operation
+      const dailyLimit = Number(applicationLimit.get('dailyLimit'));
+      const applicationsUsedToday = Number(applicationLimit.get('applicationsUsedToday'));
+      
       // Calculate remaining applications
-      const remainingApplications = applicationLimit.get('dailyLimit') - applicationLimit.get('applicationsUsedToday');
+      const remainingApplications = dailyLimit - applicationsUsedToday;
       
       return {
-        dailyLimit: applicationLimit.get('dailyLimit'),
-        applicationsUsedToday: applicationLimit.get('applicationsUsedToday'),
+        dailyLimit,
+        applicationsUsedToday,
         remainingApplications: remainingApplications > 0 ? remainingApplications : 0,
         lastResetDate: applicationLimit.get('lastResetDate'),
         hasPaid: applicationLimit.get('hasPaid')
