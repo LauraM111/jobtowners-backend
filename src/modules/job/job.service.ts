@@ -893,4 +893,41 @@ export class JobService {
     
     return counts;
   }
+
+  /**
+   * Get daily application limits for a user
+   */
+  async getDailyApplicationLimits(userId: string): Promise<any> {
+    try {
+      // Get the application limit from the ApplicationLimit model
+      const applicationLimit = await this.sequelize.models.ApplicationLimit.findOne({
+        where: { userId }
+      });
+      
+      if (!applicationLimit) {
+        // If no limit exists, return default values
+        return {
+          dailyLimit: 15, // Default limit
+          applicationsUsedToday: 0,
+          remainingApplications: 15,
+          lastResetDate: new Date(),
+          hasPaid: false
+        };
+      }
+      
+      // Calculate remaining applications
+      const remainingApplications = applicationLimit.get('dailyLimit') - applicationLimit.get('applicationsUsedToday');
+      
+      return {
+        dailyLimit: applicationLimit.get('dailyLimit'),
+        applicationsUsedToday: applicationLimit.get('applicationsUsedToday'),
+        remainingApplications: remainingApplications > 0 ? remainingApplications : 0,
+        lastResetDate: applicationLimit.get('lastResetDate'),
+        hasPaid: applicationLimit.get('hasPaid')
+      };
+    } catch (error) {
+      this.logger.error(`Error getting application limits: ${error.message}`);
+      throw error;
+    }
+  }
 }

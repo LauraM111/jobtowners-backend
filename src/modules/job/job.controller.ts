@@ -597,4 +597,43 @@ export class JobController {
     
     return successResponse(locationData, 'Job location data retrieved');
   }
+
+  @Get('applications/limits/daily')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Get daily application limits for the current user' })
+  @ApiResponse({ status: 200, description: 'Application limits retrieved successfully' })
+  async getDailyApplicationLimits(@Request() req) {
+    try {
+      const userId = req.user.sub;
+      const limits = await this.jobService.getDailyApplicationLimits(userId);
+      return successResponse(limits, 'Application limits retrieved successfully');
+    } catch (error) {
+      this.logger.error(`Error getting application limits: ${error.message}`, error.stack);
+      throw new BadRequestException(error.message);
+    }
+  }
+
+  @Get('applications/limits/public')
+  @Public()
+  @ApiOperation({ summary: 'Get default application limits for non-authenticated users' })
+  @ApiResponse({ status: 200, description: 'Default application limits retrieved successfully' })
+  async getPublicApplicationLimits() {
+    try {
+      // Return default limits for non-authenticated users
+      const defaultLimits = {
+        dailyLimit: 15, // Default limit
+        applicationsUsedToday: 0,
+        remainingApplications: 15,
+        lastResetDate: new Date(),
+        hasPaid: false,
+        message: 'Login to apply for jobs and track your application limits'
+      };
+      
+      return successResponse(defaultLimits, 'Default application limits retrieved successfully');
+    } catch (error) {
+      this.logger.error(`Error getting public application limits: ${error.message}`, error.stack);
+      throw new BadRequestException(error.message);
+    }
+  }
 } 
