@@ -920,10 +920,14 @@ export class JobService {
       // Determine the daily limit based on the user's plan
       let dailyLimit = 15; // Default limit
       let hasPaid = false;
+      let planName = 'Free Plan';
       
-      if (activePlan && activePlan.plan) {
+      // Use type assertion to access the plan property
+      const planData = activePlan?.get('plan') as any;
+      if (activePlan && planData) {
         // Use the plan's daily application limit if available
-        dailyLimit = Number(activePlan.plan.dailyApplicationLimit) || dailyLimit;
+        dailyLimit = Number(planData.dailyApplicationLimit) || dailyLimit;
+        planName = planData.name || 'Free Plan';
         hasPaid = true;
       }
       
@@ -944,13 +948,25 @@ export class JobService {
           remainingApplications: dailyLimit,
           lastResetDate: new Date(),
           hasPaid,
-          planName: activePlan?.plan?.name || 'Free Plan'
+          planName
         };
       }
       
       // Check if the limit needs to be reset (new day)
       const today = new Date();
-      const lastResetDate = new Date(applicationLimit.get('lastResetDate'));
+      
+      // Safely convert lastResetDate to a Date object
+      let lastResetDate: Date;
+      const rawLastResetDate = applicationLimit.get('lastResetDate');
+      
+      if (rawLastResetDate instanceof Date) {
+        lastResetDate = rawLastResetDate;
+      } else if (typeof rawLastResetDate === 'string' || typeof rawLastResetDate === 'number') {
+        lastResetDate = new Date(rawLastResetDate);
+      } else {
+        // Default to today if we can't parse the date
+        lastResetDate = new Date();
+      }
       
       let applicationsUsedToday = Number(applicationLimit.get('applicationsUsedToday'));
       
@@ -979,9 +995,9 @@ export class JobService {
         dailyLimit,
         applicationsUsedToday,
         remainingApplications: remainingApplications > 0 ? remainingApplications : 0,
-        lastResetDate: applicationLimit.get('lastResetDate'),
+        lastResetDate,
         hasPaid,
-        planName: activePlan?.plan?.name || 'Free Plan',
+        planName,
         canApply: remainingApplications > 0 && hasPaid
       };
     } catch (error) {
