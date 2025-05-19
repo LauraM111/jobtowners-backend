@@ -13,7 +13,7 @@ import { extname } from 'path';
 import { v4 as uuidv4 } from 'uuid';
 import { existsSync, mkdirSync } from 'fs';
 import { SavedJob } from './entities/saved-job.entity';
-import { ApplicationLimit } from '../candidate-payment/entities/application-limit.entity';
+import { JobApplication } from '../job-application/entities/job-application.entity';
 
 // Create uploads directory if it doesn't exist
 const uploadsDir = './uploads/jobs';
@@ -23,7 +23,7 @@ if (!existsSync(uploadsDir)) {
 
 @Module({
   imports: [
-    SequelizeModule.forFeature([Job, User, Company, SavedJob, ApplicationLimit]),
+    SequelizeModule.forFeature([Job, User, Company, SavedJob, JobApplication]),
     MulterModule.register({
       storage: diskStorage({
         destination: './uploads/jobs',

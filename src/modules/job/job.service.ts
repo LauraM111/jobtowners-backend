@@ -895,114 +895,85 @@ export class JobService {
   }
 
   /**
-   * Get daily application limits for a user with dynamic values
+   * Get job listing limits and application statistics for an employer
    */
-  async getDailyApplicationLimits(userId: string): Promise<any> {
-    try {
-      // Get the application limit from the ApplicationLimit model
-      const applicationLimit = await this.sequelize.models.ApplicationLimit.findOne({
-        where: { userId }
-      });
-      
-      // Get the user's active candidate payment plan if they have one
-      const activePlan = await this.sequelize.models.CandidateOrder.findOne({
-        where: { 
-          userId, 
-          status: 'completed'
-        },
-        order: [['createdAt', 'DESC']],
-        include: [{
-          model: this.sequelize.models.CandidatePlan,
-          as: 'plan'
-        }]
-      });
-      
-      // Determine the daily limit based on the user's plan
-      let dailyLimit = 15; // Default limit
-      let hasPaid = false;
-      let planName = 'Free Plan';
-      
-      // Use type assertion to access the plan property
-      const planData = activePlan?.get('plan') as any;
-      if (activePlan && planData) {
-        // Use the plan's daily application limit if available
-        dailyLimit = Number(planData.dailyApplicationLimit) || dailyLimit;
-        planName = planData.name || 'Free Plan';
-        hasPaid = true;
-      }
-      
-      // If no application limit record exists, create default values
-      if (!applicationLimit) {
-        // Create a new application limit record for this user
-        await this.sequelize.models.ApplicationLimit.create({
-          userId,
-          dailyLimit,
-          applicationsUsedToday: 0,
-          lastResetDate: new Date(),
-          hasPaid
-        });
-        
-        return {
-          dailyLimit,
-          applicationsUsedToday: 0,
-          remainingApplications: dailyLimit,
-          lastResetDate: new Date(),
-          hasPaid,
-          planName
-        };
-      }
-      
-      // Check if the limit needs to be reset (new day)
-      const today = new Date();
-      
-      // Safely convert lastResetDate to a Date object
-      let lastResetDate: Date;
-      const rawLastResetDate = applicationLimit.get('lastResetDate');
-      
-      if (rawLastResetDate instanceof Date) {
-        lastResetDate = rawLastResetDate;
-      } else if (typeof rawLastResetDate === 'string' || typeof rawLastResetDate === 'number') {
-        lastResetDate = new Date(rawLastResetDate);
-      } else {
-        // Default to today if we can't parse the date
-        lastResetDate = new Date();
-      }
-      
-      let applicationsUsedToday = Number(applicationLimit.get('applicationsUsedToday'));
-      
-      // Reset the counter if it's a new day
-      if (today.toDateString() !== lastResetDate.toDateString()) {
-        applicationsUsedToday = 0;
-        await applicationLimit.update({
-          applicationsUsedToday: 0,
-          lastResetDate: today
-        });
-      }
-      
-      // Update the daily limit and paid status if they've changed
-      if (Number(applicationLimit.get('dailyLimit')) !== dailyLimit || 
-          Boolean(applicationLimit.get('hasPaid')) !== hasPaid) {
-        await applicationLimit.update({
-          dailyLimit,
-          hasPaid
-        });
-      }
-      
-      // Calculate remaining applications
-      const remainingApplications = dailyLimit - applicationsUsedToday;
-      
-      return {
-        dailyLimit,
-        applicationsUsedToday,
-        remainingApplications: remainingApplications > 0 ? remainingApplications : 0,
-        lastResetDate,
-        hasPaid,
-        planName,
-        canApply: remainingApplications > 0 && hasPaid
-      };
-    } catch (error) {
-      this.logger.error(`Error getting application limits: ${error.message}`);
-      throw error;
+  async getJobListingLimits(userId: string): Promise<any> {
+    // Check if user exists
+    const user = await this.userModel.findByPk(userId);
+    if (!user) {
+      throw new NotFoundException('User not found');
     }
+    
+    // Get user's active subscriptions
+    const subscriptions = await this.subscriptionService.getUserSubscriptions(userId);
+    
+    // Get the highest number of jobs allowed from all active subscriptions
+    const maxJobs = subscriptions && subscriptions.length > 0 
+      ? Math.max(...subscriptions.map(sub => sub.plan.numberOfJobs))
+      : 0;
+    
+    // Get current active jobs count
+    const activeJobs = await this.jobModel.count({
+      where: {
+        userId,
+        status: {
+          [Op.ne]: JobStatus.EXPIRED
+        }
+      }
+    });
+    
+    // Get today's job posting count
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    
+    const jobsPostedToday = await this.jobModel.count({
+      where: {
+        userId,
+        createdAt: {
+          [Op.gte]: today
+        }
+      }
+    });
+    
+    // Get application statistics
+    const totalApplications = await this.jobModel.sum('applications', {
+      where: { userId }
+    });
+    
+    // Get applications received today
+    const applicationsToday = await this.sequelize.models.JobApplication.count({
+      where: {
+        createdAt: {
+          [Op.gte]: today
+        },
+        jobId: {
+          [Op.in]: Sequelize.literal(`(SELECT id FROM jobs WHERE userId = '${userId}')`)
+        }
+      }
+    });
+    
+    // Get subscription details - removed expiryDate
+    const subscriptionDetails = subscriptions && subscriptions.length > 0
+      ? subscriptions.map(sub => ({
+          id: sub.id,
+          planName: sub.plan.name,
+          jobsAllowed: sub.plan.numberOfJobs
+        }))
+      : [];
+    
+    return {
+      jobLimits: {
+        maxJobsAllowed: maxJobs,
+        activeJobs: activeJobs,
+        remainingSlots: Math.max(0, maxJobs - activeJobs),
+        jobsPostedToday: jobsPostedToday
+      },
+      applicationStats: {
+        totalApplications: totalApplications || 0,
+        applicationsToday: applicationsToday || 0
+      },
+      subscriptions: subscriptionDetails,
+      hasActiveSubscription: subscriptions && subscriptions.length > 0
+    };
   }
 }
