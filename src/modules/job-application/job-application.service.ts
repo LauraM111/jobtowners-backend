@@ -660,69 +660,55 @@ export class JobApplicationService {
   }
 
   /**
-   * Find applications for a specific job by a specific candidate, including resume data and company information
+   * Find applications for a specific job by a specific candidate, including resume data and job information
    * @param jobId The ID of the job
    * @param candidateId The ID of the candidate
-   * @returns Array of job applications with resume data and company information
+   * @returns Array of job applications with resume data and job information
    */
   async findApplicationsByJobAndCandidateWithResume(jobId: string, candidateId: string): Promise<JobApplication[]> {
-    return this.jobApplicationModel.findAll({
-      where: {
-        jobId,
-        applicantId: candidateId
-      },
-      include: [
-        // Include job data with company information
-        {
-          model: Job,
-          as: 'job',
-          attributes: ['id', 'title', 'jobTitle', 'jobType', 'offeredSalary', 'city', 'country', 
-                      'state', 'completeAddress', 'applicationDeadlineDate', 'companyId', 'status',
-                      'industry', 'category', 'experience', 'qualification'],
-          include: [
-            {
-              model: Company,
-              as: 'company',
-              attributes: ['id', 'name', 'logo', 'website', 'industry', 'description']
-            },
-            {
-              model: User,
-              as: 'user',
-              attributes: ['id', 'firstName', 'lastName', 'email', 'companyName']
-            }
-          ]
+    try {
+      // First, check if the job application exists
+      const applications = await this.jobApplicationModel.findAll({
+        where: {
+          jobId,
+          applicantId: candidateId
         },
-        // Include resume data
-        {
-          model: Resume,
-          as: 'resume',
-          attributes: ['id', 'firstName', 'lastName', 'email', 'phone', 'cvUrl', 'createdAt', 'updatedAt',
-                      'qualification', 'yearsOfExperience', 'professionalSkills'],
-          include: [
-            {
-              model: Education,
-              as: 'education',
-              attributes: ['id', 'institution', 'degree', 'fieldOfStudy', 'startDate', 'endDate', 'description']
-            },
-            {
-              model: Experience,
-              as: 'experiences',
-              attributes: ['id', 'position', 'companyName', 'startDate', 'endDate', 'description']
-            },
-            {
-              model: Attachment,
-              as: 'attachments',
-              attributes: ['id', 'fileName', 'fileUrl', 'description']
-            }
-          ]
-        },
-        // Include applicant data
-        {
-          model: User,
-          as: 'applicant',
-          attributes: ['id', 'firstName', 'lastName', 'email', 'phoneNumber', 'userType']
-        }
-      ]
-    });
+        include: [
+          // Include job data
+          {
+            model: Job,
+            as: 'job',
+            attributes: ['id', 'title', 'jobTitle', 'jobType', 'offeredSalary', 'city', 'country', 
+                        'state', 'completeAddress', 'applicationDeadlineDate', 'status',
+                        'industry', 'category', 'experience', 'qualification', 'userId'],
+            include: [
+              {
+                model: User,
+                as: 'user',
+                attributes: ['id', 'firstName', 'lastName', 'email', 'companyName']
+              }
+            ]
+          },
+          // Include resume data
+          {
+            model: Resume,
+            as: 'resume',
+            attributes: ['id', 'firstName', 'lastName', 'email', 'phone', 'cvUrl', 'createdAt', 'updatedAt',
+                        'qualification', 'yearsOfExperience', 'professionalSkills']
+          },
+          // Include applicant data
+          {
+            model: User,
+            as: 'applicant',
+            attributes: ['id', 'firstName', 'lastName', 'email', 'phoneNumber', 'userType']
+          }
+        ]
+      });
+      
+      return applications;
+    } catch (error) {
+      console.error('Error finding job applications:', error.message);
+      throw new BadRequestException(error.message);
+    }
   }
 } 
