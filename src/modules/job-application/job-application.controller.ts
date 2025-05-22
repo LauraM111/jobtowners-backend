@@ -374,9 +374,8 @@ export class JobApplicationController {
   @Get('jobs/candidate/applications/:id')
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
-  @ApiOperation({ summary: 'Get candidate applications for a specific job' })
+  @ApiOperation({ summary: 'Get applications for a specific job' })
   @ApiResponse({ status: 200, description: 'Applications retrieved successfully' })
-  @ApiResponse({ status: 403, description: 'Forbidden - Not authorized to view these applications' })
   @ApiResponse({ status: 404, description: 'No applications found for this job' })
   async getCandidateApplicationsByJobId(
     @Param('id') jobId: string,
@@ -386,17 +385,19 @@ export class JobApplicationController {
       const userId = req.user.sub;
       const userType = req.user.userType;
       
-      // Validate that the user has permission to view these applications
-      // Only the candidate who applied or an admin should be able to view
-      if (userType !== UserType.ADMIN && userType !== UserType.CANDIDATE) {
-        throw new BadRequestException('You are not authorized to view these applications');
-      }
+      // Get applications based on user type and permissions
+      let applications;
       
-      // Get applications for this job by this candidate
-      const applications = await this.jobApplicationService.findApplicationsByJobAndCandidate(
-        jobId,
-        userId
-      );
+      if (userType === UserType.ADMIN) {
+        // Admins can see all applications for the job
+        applications = await this.jobApplicationService.findAllApplicationsByJobId(jobId);
+      } else if (userType === UserType.EMPLOYER) {
+        // Employers can only see applications for jobs they posted
+        applications = await this.jobApplicationService.findApplicationsByJobForEmployer(jobId, userId);
+      } else {
+        // Candidates and other users can only see their own applications
+        applications = await this.jobApplicationService.findApplicationsByJobAndCandidate(jobId, userId);
+      }
       
       if (!applications || applications.length === 0) {
         return successResponse(
@@ -410,7 +411,7 @@ export class JobApplicationController {
         'Applications retrieved successfully'
       );
     } catch (error) {
-      console.error('Error retrieving candidate applications:', error.message);
+      console.error('Error retrieving job applications:', error.message);
       throw new BadRequestException(error.message);
     }
   }

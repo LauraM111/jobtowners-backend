@@ -713,4 +713,109 @@ export class JobApplicationService {
       throw new Error(`Failed to retrieve applications: ${error.message}`);
     }
   }
+
+  /**
+   * Find all applications for a specific job (admin only)
+   * @param jobId The ID of the job
+   * @returns Promise with array of job applications with related data
+   */
+  async findAllApplicationsByJobId(jobId: string): Promise<JobApplication[]> {
+    try {
+      // Find all applications for the specified job
+      const applications = await this.jobApplicationModel.findAll({
+        where: { jobId },
+        include: [
+          // Include job details
+          {
+            model: this.jobModel,
+            as: 'job',
+            attributes: [
+              'id', 'title', 'description', 'companyName', 'location', 
+              'salary', 'jobType', 'experienceLevel', 'status', 'createdAt'
+            ]
+          },
+          // Include candidate details (the applicant)
+          {
+            model: this.userModel,
+            as: 'applicant',
+            attributes: [
+              'id', 'firstName', 'lastName', 'email', 'phoneNumber', 
+              'userType', 'status'
+            ]
+          },
+          // Include resume details if applicable
+          {
+            model: this.resumeModel,
+            as: 'resume',
+            attributes: ['id', 'fileName', 'fileUrl']
+          }
+        ],
+        order: [['createdAt', 'DESC']]
+      });
+
+      return applications;
+    } catch (error) {
+      console.error('Error finding all applications by job ID:', error);
+      throw new Error(`Failed to retrieve applications: ${error.message}`);
+    }
+  }
+
+  /**
+   * Find all applications for a specific job posted by an employer
+   * @param jobId The ID of the job
+   * @param employerId The ID of the employer
+   * @returns Promise with array of job applications with related data
+   */
+  async findApplicationsByJobForEmployer(jobId: string, employerId: string): Promise<JobApplication[]> {
+    try {
+      // First verify that the job belongs to this employer
+      const job = await this.jobModel.findOne({
+        where: {
+          id: jobId,
+          userId: employerId
+        }
+      });
+
+      if (!job) {
+        throw new ForbiddenException('You do not have permission to view applications for this job');
+      }
+
+      // Find all applications for the specified job
+      const applications = await this.jobApplicationModel.findAll({
+        where: { jobId },
+        include: [
+          // Include job details
+          {
+            model: this.jobModel,
+            as: 'job',
+            attributes: [
+              'id', 'title', 'description', 'companyName', 'location', 
+              'salary', 'jobType', 'experienceLevel', 'status', 'createdAt'
+            ]
+          },
+          // Include candidate details (the applicant)
+          {
+            model: this.userModel,
+            as: 'applicant',
+            attributes: [
+              'id', 'firstName', 'lastName', 'email', 'phoneNumber', 
+              'userType', 'status'
+            ]
+          },
+          // Include resume details if applicable
+          {
+            model: this.resumeModel,
+            as: 'resume',
+            attributes: ['id', 'fileName', 'fileUrl']
+          }
+        ],
+        order: [['createdAt', 'DESC']]
+      });
+
+      return applications;
+    } catch (error) {
+      console.error('Error finding applications by job for employer:', error);
+      throw new Error(`Failed to retrieve applications: ${error.message}`);
+    }
+  }
 } 
