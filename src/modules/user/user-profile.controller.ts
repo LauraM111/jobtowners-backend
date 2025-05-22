@@ -208,6 +208,7 @@ export class UserProfileController {
       console.log(`Found user: ${user.firstName} ${user.lastName}, type: ${user.userType}`);
       
       // Initialize response object
+
       const userData: any = {
         user: {
           id: user.id,
@@ -221,7 +222,9 @@ export class UserProfileController {
           updatedAt: user.updatedAt,
           isEmailVerified: user.isEmailVerified,
           companyName: user.companyName,
-          stripeCustomerId: user.stripeCustomerId
+          stripeCustomerId: user.stripeCustomerId,
+          studentPermitImage: user.studentPermitImage,
+          proofOfEnrollmentImage: user.proofOfEnrollmentImage
         }
       };
       

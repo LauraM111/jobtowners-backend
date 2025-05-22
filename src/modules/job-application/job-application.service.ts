@@ -655,4 +655,33 @@ export class JobApplicationService {
       throw error;
     }
   }
+
+  /**
+   * Find applications for a specific job by a specific candidate, including resume data
+   * @param jobId The ID of the job
+   * @param candidateId The ID of the candidate
+   * @returns Array of job applications with resume data
+   */
+  async findApplicationsByJobAndCandidateWithResume(jobId: string, candidateId: string): Promise<JobApplication[]> {
+    return this.jobApplicationModel.findAll({
+      where: {
+        jobId,
+        applicantId: candidateId
+      },
+      include: [
+        // Include job data
+        {
+          model: Job,
+          as: 'job',
+          attributes: ['id', 'title', 'companyName', 'location', 'salary']
+        },
+        // Include resume data by joining with the Resume model
+        {
+          model: Resume,
+          as: 'resume',
+          attributes: ['id', 'title', 'fileName', 'fileUrl', 'createdAt', 'updatedAt']
+        }
+      ]
+    });
+  }
 } 
