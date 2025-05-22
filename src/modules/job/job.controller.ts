@@ -612,4 +612,18 @@ export class JobController {
       throw new BadRequestException(error.message);
     }
   }
+
+  @Get('applications/limits/daily/:userId')
+  @Public()
+  @ApiOperation({ summary: 'Get job listing and application limits for the employer' })
+  @ApiResponse({ status: 200, description: 'Job listing limits retrieved successfully' })
+  async getJobListingLimitsByUserId(@Request() req, @Param('userId') userId: string) {
+    try {
+      const limits = await this.jobService.getJobListingLimits(userId);
+      return successResponse(limits, 'Job listing limits retrieved successfully');
+    } catch (error) {
+      this.logger.error(`Error retrieving job listing limits: ${error.message}`, error.stack);
+      throw new BadRequestException(error.message);
+    }
+  }
 } 

@@ -911,7 +911,10 @@ export class JobService {
     const maxJobs = subscriptions && subscriptions.length > 0 
       ? Math.max(...subscriptions.map(sub => sub.plan.numberOfJobs))
       : 0;
-    
+   
+    const maxApplications = subscriptions && subscriptions.length > 0 
+      ? Math.max(...subscriptions.map(sub => sub.plan.resumeViewsCount))
+      : 0;
     // Get current active jobs count
     const activeJobs = await this.jobModel.count({
       where: {
@@ -940,17 +943,22 @@ export class JobService {
       where: { userId }
     });
     
-    // Get applications received today
-    const applicationsToday = await this.sequelize.models.JobApplication.count({
+    // Get applications received in the last 24 hours
+    const last24Hours = new Date();
+    last24Hours.setHours(last24Hours.getHours() - 24);
+    
+    const applicationsLast24Hours = await this.sequelize.models.JobApplication.count({
       where: {
         createdAt: {
-          [Op.gte]: today
+          [Op.gte]: last24Hours
         },
         jobId: {
           [Op.in]: Sequelize.literal(`(SELECT id FROM jobs WHERE userId = '${userId}')`)
         }
       }
     });
+    
+   
     
     // Get subscription details - removed expiryDate
     const subscriptionDetails = subscriptions && subscriptions.length > 0
@@ -970,7 +978,8 @@ export class JobService {
       },
       applicationStats: {
         totalApplications: totalApplications || 0,
-        applicationsToday: applicationsToday || 0
+        applicationsToday: applicationsLast24Hours || 0,
+        maxApplications: maxApplications || 0
       },
       subscriptions: subscriptionDetails,
       hasActiveSubscription: subscriptions && subscriptions.length > 0
