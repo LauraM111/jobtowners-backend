@@ -371,47 +371,27 @@ export class JobApplicationController {
     }
   }
 
-  @Get('jobs/candidate/applications/:id')
   @UseGuards(JwtAuthGuard)
+  @Get('jobs/candidate/applications/:id')
   @ApiBearerAuth()
-  @ApiOperation({ summary: 'Get applications for a specific job' })
-  @ApiResponse({ status: 200, description: 'Applications retrieved successfully' })
-  @ApiResponse({ status: 404, description: 'No applications found for this job' })
-  async getCandidateApplicationsByJobId(
-    @Param('id') jobId: string,
-    @Request() req
-  ) {
+  @ApiOperation({ summary: 'Get job application with resume and job details' })
+  @ApiResponse({ status: 200, description: 'Application details retrieved successfully' })
+  @ApiResponse({ status: 404, description: 'Application not found' })
+  @ApiResponse({ status: 403, description: 'Unauthorized access' })
+  async getApplicationWithDetails(@Param('id') id: string, @Request() req) {
     try {
       const userId = req.user.sub;
       const userType = req.user.userType;
       
-      // Get applications based on user type and permissions
-      let applications;
-      
-      if (userType === UserType.ADMIN) {
-        // Admins can see all applications for the job
-        applications = await this.jobApplicationService.findAllApplicationsByJobId(jobId);
-      } else if (userType === UserType.EMPLOYER) {
-        // Employers can only see applications for jobs they posted
-        applications = await this.jobApplicationService.findApplicationsByJobForEmployer(jobId, userId);
-      } else {
-        // Candidates and other users can only see their own applications
-        applications = await this.jobApplicationService.findApplicationsByJobAndCandidate(jobId, userId);
-      }
-      
-      if (!applications || applications.length === 0) {
-        return successResponse(
-          { applications: [] },
-          'No applications found for this job'
-        );
-      }
+      // Get application with resume and job details
+      const applicationData = await this.jobApplicationService.getApplicationWithDetails(id, userId, userType);
       
       return successResponse(
-        { applications },
-        'Applications retrieved successfully'
+        applicationData,
+        'Application details retrieved successfully'
       );
     } catch (error) {
-      console.error('Error retrieving job applications:', error.message);
+      console.error('Error retrieving application details:', error.message);
       throw new BadRequestException(error.message);
     }
   }

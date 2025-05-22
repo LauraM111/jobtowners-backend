@@ -657,165 +657,103 @@ export class JobApplicationService {
   }
 
   /**
-   * Find all applications for a specific job by a specific candidate
-   * @param jobId The ID of the job
-   * @param candidateId The ID of the candidate
-   * @returns Promise with array of job applications with related data
+   * Get job application with resume and job details
+   * @param id Application ID
+   * @param userId User ID of the requester
+   * @param userType Type of the user making the request
+   * @returns Application with resume and job details
    */
-  async findApplicationsByJobAndCandidate(jobId: string, candidateId: string): Promise<JobApplication[]> {
+  async getApplicationWithDetails(id: string, userId: string, userType: string): Promise<any> {
     try {
-      // Find all applications that match the job ID and candidate ID
-      const applications = await this.jobApplicationModel.findAll({
-        where: {
-          jobId,
-          applicantId: candidateId
-        },
+      // Find the application with basic relations
+      const application = await this.jobApplicationModel.findOne({
+        where: { id },
         include: [
-          // Include job details
-          {
-            model: this.jobModel,
-            as: 'job',
-            attributes: [
-              'id', 'title', 'description', 'companyName', 'location', 
-              'salary', 'jobType', 'experienceLevel', 'status', 'createdAt'
-            ]
-          },
-          // Include candidate details (the applicant)
-          {
-            model: this.userModel,
-            as: 'applicant',
-            attributes: [
-              'id', 'firstName', 'lastName', 'email', 'phoneNumber', 
-              'userType', 'status'
-            ]
-          },
-          // Include employer details (the job poster)
-          {
-            model: this.userModel,
-            as: 'employer',
-            attributes: [
-              'id', 'firstName', 'lastName', 'email', 'companyName'
-            ]
-          },
-          // Include resume details if applicable
           {
             model: this.resumeModel,
             as: 'resume',
-            attributes: ['id', 'fileName', 'fileUrl']
-          }
-        ],
-        order: [['createdAt', 'DESC']]
-      });
-
-      return applications;
-    } catch (error) {
-      console.error('Error finding applications by job and candidate:', error);
-      throw new Error(`Failed to retrieve applications: ${error.message}`);
-    }
-  }
-
-  /**
-   * Find all applications for a specific job (admin only)
-   * @param jobId The ID of the job
-   * @returns Promise with array of job applications with related data
-   */
-  async findAllApplicationsByJobId(jobId: string): Promise<JobApplication[]> {
-    try {
-      // Find all applications for the specified job
-      const applications = await this.jobApplicationModel.findAll({
-        where: { jobId },
-        include: [
-          // Include job details
+            attributes: { exclude: ['deletedAt'] },
+            include: [
+              {
+                model: this.educationModel,
+                as: 'education',
+                attributes: [
+                  'id', 'institution', 'degree', 'fieldOfStudy', 
+                  'startDate', 'endDate', 'description'
+                ]
+              },
+              {
+                model: this.experienceModel,
+                as: 'experiences',
+                attributes: [
+                  'id', 'position', 'companyName', 'startDate', 
+                  'endDate', 'description'
+                ]
+              }
+            ]
+          },
           {
             model: this.jobModel,
             as: 'job',
-            attributes: [
-              'id', 'title', 'description', 'companyName', 'location', 
-              'salary', 'jobType', 'experienceLevel', 'status', 'createdAt'
+            include: [
+              {
+                model: this.userModel,
+                as: 'user',
+                attributes: ['id', 'firstName', 'lastName', 'email', 'companyName']
+              }
             ]
           },
-          // Include candidate details (the applicant)
           {
             model: this.userModel,
             as: 'applicant',
-            attributes: [
-              'id', 'firstName', 'lastName', 'email', 'phoneNumber', 
-              'userType', 'status'
-            ]
-          },
-          // Include resume details if applicable
-          {
-            model: this.resumeModel,
-            as: 'resume',
-            attributes: ['id', 'fileName', 'fileUrl']
+            attributes: ['id', 'firstName', 'lastName', 'email', 'phoneNumber']
           }
-        ],
-        order: [['createdAt', 'DESC']]
+        ]
       });
 
-      return applications;
-    } catch (error) {
-      console.error('Error finding all applications by job ID:', error);
-      throw new Error(`Failed to retrieve applications: ${error.message}`);
-    }
-  }
-
-  /**
-   * Find all applications for a specific job posted by an employer
-   * @param jobId The ID of the job
-   * @param employerId The ID of the employer
-   * @returns Promise with array of job applications with related data
-   */
-  async findApplicationsByJobForEmployer(jobId: string, employerId: string): Promise<JobApplication[]> {
-    try {
-      // First verify that the job belongs to this employer
-      const job = await this.jobModel.findOne({
-        where: {
-          id: jobId,
-          userId: employerId
-        }
-      });
-
-      if (!job) {
-        throw new ForbiddenException('You do not have permission to view applications for this job');
+      if (!application) {
+        throw new NotFoundException('Application not found');
       }
 
-      // Find all applications for the specified job
-      const applications = await this.jobApplicationModel.findAll({
-        where: { jobId },
-        include: [
-          // Include job details
-          {
-            model: this.jobModel,
-            as: 'job',
-            attributes: [
-              'id', 'title', 'description', 'companyName', 'location', 
-              'salary', 'jobType', 'experienceLevel', 'status', 'createdAt'
-            ]
-          },
-          // Include candidate details (the applicant)
-          {
-            model: this.userModel,
-            as: 'applicant',
-            attributes: [
-              'id', 'firstName', 'lastName', 'email', 'phoneNumber', 
-              'userType', 'status'
-            ]
-          },
-          // Include resume details if applicable
-          {
-            model: this.resumeModel,
-            as: 'resume',
-            attributes: ['id', 'fileName', 'fileUrl']
-          }
-        ],
-        order: [['createdAt', 'DESC']]
-      });
-
-      return applications;
+      // Check if user has permission to view this application
+      const isAdmin = userType === UserType.ADMIN;
+      const isEmployer = userType === UserType.EMPLOYER;
+      const isCandidate = userType === UserType.CANDIDATE;
+      
+      // Candidate can only view their own applications
+      if (isCandidate && application.applicantId !== userId) {
+        throw new ForbiddenException('You do not have permission to view this application');
+      }
+      
+      // Employer can only view applications for their jobs
+      if (isEmployer) {
+        const job = await this.jobModel.findByPk(application.jobId);
+        if (job && job.userId !== userId) {
+          throw new ForbiddenException('You do not have permission to view this application');
+        }
+      }
+      
+      // Format and return the application data
+      return {
+        id: application.id,
+        status: application.status,
+        coverLetter: application.coverLetter,
+        adminNotes: application.adminNotes,
+        createdAt: application.createdAt,
+        updatedAt: application.updatedAt,
+        
+        // Resume data with education and experiences
+        resume: application.resume,
+        
+        // Job data
+        job: application.job,
+        
+        // Applicant data (basic info only)
+        applicant: application.applicant
+      };
     } catch (error) {
-      console.error('Error finding applications by job for employer:', error);
-      throw new Error(`Failed to retrieve applications: ${error.message}`);
+      console.error('Error retrieving application details:', error);
+      throw error;
     }
   }
 } 
