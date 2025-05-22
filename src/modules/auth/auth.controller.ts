@@ -35,7 +35,7 @@ export class AuthController {
       if (req.user.status === 'inactive') {
         throw new UnauthorizedException({
           success: false,
-          message: 'Your account is inactive. Please contact support at laur@jobtowners.com for assistance.',
+          message: 'Your account is inactive. Please wait for approval or contact support at laura@jobtowners.com for assistance.',
           accountStatus: 'inactive',
           supportEmail: 'laura@jobtowners.com'
         });
@@ -46,7 +46,7 @@ export class AuthController {
           success: false,
           message: 'Your account has been suspended. Please contact support at laur@jobtowners.com for assistance.',
           accountStatus: 'suspended',
-          supportEmail: 'laura@jobtowners.com'
+          supportEmail: 'laura@jobtowners.com' 
         });
       }
       
