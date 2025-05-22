@@ -15,6 +15,7 @@ import { Job } from '../job/entities/job.entity';
 import { Education } from '../resume/entities/education.entity';
 import { Experience } from '../resume/entities/experience.entity';
 import { Attachment } from '../resume/entities/attachment.entity';
+import { Company } from '../company/entities/company.entity';
 
 @Injectable()
 export class JobApplicationService {
@@ -37,6 +38,8 @@ export class JobApplicationService {
     private experienceModel: typeof Experience,
     @InjectModel(Attachment)
     private attachmentModel: typeof Attachment,
+    @InjectModel(Company)
+    private companyModel: typeof Company,
   ) {}
 
   async create(userId: string, createJobApplicationDto: CreateJobApplicationDto): Promise<JobApplication> {
@@ -657,10 +660,10 @@ export class JobApplicationService {
   }
 
   /**
-   * Find applications for a specific job by a specific candidate, including resume data
+   * Find applications for a specific job by a specific candidate, including resume data and company information
    * @param jobId The ID of the job
    * @param candidateId The ID of the candidate
-   * @returns Array of job applications with resume data
+   * @returns Array of job applications with resume data and company information
    */
   async findApplicationsByJobAndCandidateWithResume(jobId: string, candidateId: string): Promise<JobApplication[]> {
     return this.jobApplicationModel.findAll({
@@ -669,17 +672,35 @@ export class JobApplicationService {
         applicantId: candidateId
       },
       include: [
-        // Include job data
+        // Include job data with company information
         {
           model: Job,
           as: 'job',
-          attributes: ['id', 'title', 'companyName', 'location', 'salary']
+          attributes: ['id', 'title', 'jobTitle', 'jobType', 'offeredSalary', 'location', 'city', 'country', 'applicationDeadlineDate', 'companyId'],
+          include: [
+            {
+              model: Company,
+              as: 'company',
+              attributes: ['id', 'name', 'logo', 'website', 'industry', 'description']
+            },
+            {
+              model: User,
+              as: 'user',
+              attributes: ['id', 'firstName', 'lastName', 'email', 'companyName']
+            }
+          ]
         },
-        // Include resume data by joining with the Resume model
+        // Include resume data
         {
           model: Resume,
           as: 'resume',
-          attributes: ['id', 'title', 'fileName', 'fileUrl', 'createdAt', 'updatedAt']
+          attributes: ['id', 'firstName', 'lastName', 'email', 'phone', 'cvUrl', 'createdAt', 'updatedAt']
+        },
+        // Include applicant data
+        {
+          model: User,
+          as: 'applicant',
+          attributes: ['id', 'firstName', 'lastName', 'email', 'phoneNumber']
         }
       ]
     });
