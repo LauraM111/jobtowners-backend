@@ -170,9 +170,9 @@ export class AuthService {
     };
     
     // If user status is INACTIVE, change it to ACTIVE
-    if (user.status === 'inactive') {
-      updateData.status = 'active';
-    }
+    // if (user.status === 'inactive') {
+    //   updateData.status = 'active';
+    // }
     
     // Update the user record
     await this.userService.update(tokenRecord.userId, updateData);

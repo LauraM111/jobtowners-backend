@@ -27,9 +27,29 @@ export class AuthController {
   @ApiOperation({ summary: 'Login with email and password' })
   @ApiResponse({ status: 200, description: 'Login successful' })
   @ApiResponse({ status: 401, description: 'Unauthorized - Invalid credentials or email not verified' })
+  @ApiResponse({ status: 403, description: 'Forbidden - Account inactive or suspended' })
   @UseGuards(LocalAuthGuard)
   async login(@Request() req, @Body() loginDto: LoginDto) {
     try {
+      // Check user status before proceeding with login
+      if (req.user.status === 'inactive') {
+        throw new UnauthorizedException({
+          success: false,
+          message: 'Your account is inactive. Please contact support at laur@jobtowners.com for assistance.',
+          accountStatus: 'inactive',
+          supportEmail: 'laura@jobtowners.com'
+        });
+      }
+      
+      if (req.user.status === 'suspended') {
+        throw new UnauthorizedException({
+          success: false,
+          message: 'Your account has been suspended. Please contact support at laur@jobtowners.com for assistance.',
+          accountStatus: 'suspended',
+          supportEmail: 'laura@jobtowners.com'
+        });
+      }
+      
       return this.authService.login(req.user);
     } catch (error) {
       if (error instanceof UnauthorizedException && 
