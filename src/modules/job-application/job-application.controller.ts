@@ -388,7 +388,7 @@ export class JobApplicationController {
       
       // Validate that the user has permission to view these applications
       // Only the candidate who applied or an admin should be able to view
-      if (userType !== UserType.ADMIN && userType !== UserType.CANDIDATE) {
+      if (userType == UserType.EMPLOYER) {
         throw new BadRequestException('You are not authorized to view these applications');
       }
       
