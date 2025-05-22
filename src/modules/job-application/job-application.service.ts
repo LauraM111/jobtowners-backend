@@ -15,7 +15,6 @@ import { Job } from '../job/entities/job.entity';
 import { Education } from '../resume/entities/education.entity';
 import { Experience } from '../resume/entities/experience.entity';
 import { Attachment } from '../resume/entities/attachment.entity';
-import { Company } from '../company/entities/company.entity';
 
 @Injectable()
 export class JobApplicationService {
@@ -38,8 +37,6 @@ export class JobApplicationService {
     private experienceModel: typeof Experience,
     @InjectModel(Attachment)
     private attachmentModel: typeof Attachment,
-    @InjectModel(Company)
-    private companyModel: typeof Company,
   ) {}
 
   async create(userId: string, createJobApplicationDto: CreateJobApplicationDto): Promise<JobApplication> {
@@ -660,55 +657,60 @@ export class JobApplicationService {
   }
 
   /**
-   * Find applications for a specific job by a specific candidate, including resume data and job information
+   * Find all applications for a specific job by a specific candidate
    * @param jobId The ID of the job
    * @param candidateId The ID of the candidate
-   * @returns Array of job applications with resume data and job information
+   * @returns Promise with array of job applications with related data
    */
-  async findApplicationsByJobAndCandidateWithResume(jobId: string, candidateId: string): Promise<JobApplication[]> {
+  async findApplicationsByJobAndCandidate(jobId: string, candidateId: string): Promise<JobApplication[]> {
     try {
-      // First, check if the job application exists
+      // Find all applications that match the job ID and candidate ID
       const applications = await this.jobApplicationModel.findAll({
         where: {
           jobId,
           applicantId: candidateId
         },
         include: [
-          // Include job data
+          // Include job details
           {
-            model: Job,
+            model: this.jobModel,
             as: 'job',
-            attributes: ['id', 'title', 'jobTitle', 'jobType', 'offeredSalary', 'city', 'country', 
-                        'state', 'completeAddress', 'applicationDeadlineDate', 'status',
-                        'industry', 'category', 'experience', 'qualification', 'userId'],
-            include: [
-              {
-                model: User,
-                as: 'user',
-                attributes: ['id', 'firstName', 'lastName', 'email', 'companyName']
-              }
+            attributes: [
+              'id', 'title', 'description', 'companyName', 'location', 
+              'salary', 'jobType', 'experienceLevel', 'status', 'createdAt'
             ]
           },
-          // Include resume data
+          // Include candidate details (the applicant)
           {
-            model: Resume,
-            as: 'resume',
-            attributes: ['id', 'firstName', 'lastName', 'email', 'phone', 'cvUrl', 'createdAt', 'updatedAt',
-                        'qualification', 'yearsOfExperience', 'professionalSkills']
-          },
-          // Include applicant data
-          {
-            model: User,
+            model: this.userModel,
             as: 'applicant',
-            attributes: ['id', 'firstName', 'lastName', 'email', 'phoneNumber', 'userType']
+            attributes: [
+              'id', 'firstName', 'lastName', 'email', 'phoneNumber', 
+              'userType', 'status'
+            ]
+          },
+          // Include employer details (the job poster)
+          {
+            model: this.userModel,
+            as: 'employer',
+            attributes: [
+              'id', 'firstName', 'lastName', 'email', 'companyName'
+            ]
+          },
+          // Include resume details if applicable
+          {
+            model: this.resumeModel,
+            as: 'resume',
+            attributes: ['id', 'fileName', 'fileUrl']
           }
-        ]
+        ],
+        order: [['createdAt', 'DESC']]
       });
-      
+
       return applications;
     } catch (error) {
-      console.error('Error finding job applications:', error.message);
-      throw new BadRequestException(error.message);
+      console.error('Error finding applications by job and candidate:', error);
+      throw new Error(`Failed to retrieve applications: ${error.message}`);
     }
   }
 } 

@@ -14,8 +14,6 @@ import { CandidatePaymentModule } from '../candidate-payment/candidate-payment.m
 import { Education } from '../resume/entities/education.entity';
 import { Experience } from '../resume/entities/experience.entity';
 import { Attachment } from '../resume/entities/attachment.entity';
-import { CompanyModule } from '../company/company.module';
-import { Company } from '../company/entities/company.entity';
 
 @Module({
   imports: [
@@ -26,15 +24,13 @@ import { Company } from '../company/entities/company.entity';
       Job,
       Education,
       Experience,
-      Attachment,
-      Company
+      Attachment
     ]),
     JobModule,
     ResumeModule,
     UserModule,
     SubscriptionModule,
     CandidatePaymentModule,
-    CompanyModule,
   ],
   controllers: [JobApplicationController],
   providers: [JobApplicationService],

@@ -374,7 +374,7 @@ export class JobApplicationController {
   @Get('jobs/candidate/applications/:id')
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
-  @ApiOperation({ summary: 'Get candidate applications for a specific job with resume data' })
+  @ApiOperation({ summary: 'Get candidate applications for a specific job' })
   @ApiResponse({ status: 200, description: 'Applications retrieved successfully' })
   @ApiResponse({ status: 403, description: 'Forbidden - Not authorized to view these applications' })
   @ApiResponse({ status: 404, description: 'No applications found for this job' })
@@ -388,9 +388,12 @@ export class JobApplicationController {
       
       // Validate that the user has permission to view these applications
       // Only the candidate who applied or an admin should be able to view
+      if (userType !== UserType.ADMIN && userType !== UserType.CANDIDATE) {
+        throw new BadRequestException('You are not authorized to view these applications');
+      }
       
-      // Get applications for this job by this candidate, including resume data
-      const applications = await this.jobApplicationService.findApplicationsByJobAndCandidateWithResume(
+      // Get applications for this job by this candidate
+      const applications = await this.jobApplicationService.findApplicationsByJobAndCandidate(
         jobId,
         userId
       );
