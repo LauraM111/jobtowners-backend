@@ -676,7 +676,9 @@ export class JobApplicationService {
         {
           model: Job,
           as: 'job',
-          attributes: ['id', 'title', 'jobTitle', 'jobType', 'offeredSalary', 'location', 'city', 'country', 'applicationDeadlineDate', 'companyId'],
+          attributes: ['id', 'title', 'jobTitle', 'jobType', 'offeredSalary', 'city', 'country', 
+                      'state', 'completeAddress', 'applicationDeadlineDate', 'companyId', 'status',
+                      'industry', 'category', 'experience', 'qualification'],
           include: [
             {
               model: Company,
@@ -694,13 +696,31 @@ export class JobApplicationService {
         {
           model: Resume,
           as: 'resume',
-          attributes: ['id', 'firstName', 'lastName', 'email', 'phone', 'cvUrl', 'createdAt', 'updatedAt']
+          attributes: ['id', 'firstName', 'lastName', 'email', 'phone', 'cvUrl', 'createdAt', 'updatedAt',
+                      'qualification', 'yearsOfExperience', 'professionalSkills'],
+          include: [
+            {
+              model: Education,
+              as: 'education',
+              attributes: ['id', 'institution', 'degree', 'fieldOfStudy', 'startDate', 'endDate', 'description']
+            },
+            {
+              model: Experience,
+              as: 'experiences',
+              attributes: ['id', 'position', 'companyName', 'startDate', 'endDate', 'description']
+            },
+            {
+              model: Attachment,
+              as: 'attachments',
+              attributes: ['id', 'fileName', 'fileUrl', 'description']
+            }
+          ]
         },
         // Include applicant data
         {
           model: User,
           as: 'applicant',
-          attributes: ['id', 'firstName', 'lastName', 'email', 'phoneNumber']
+          attributes: ['id', 'firstName', 'lastName', 'email', 'phoneNumber', 'userType']
         }
       ]
     });
