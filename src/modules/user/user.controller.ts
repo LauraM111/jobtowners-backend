@@ -179,7 +179,7 @@ export class UserController {
       if (error instanceof ConflictException) {
         throw new HttpException({
           success: false,
-          message: error.message,
+          message: 'An account with this email already exists. Please try to reset your password if you forgot it.',
           data: null
         }, HttpStatus.CONFLICT);
       }
@@ -226,7 +226,7 @@ export class UserController {
         // Return a more user-friendly message for duplicate email/username
         return {
           success: false,
-          message: error.message,
+          message: 'An account with this email already exists. Please try to reset your password if you forgot it.',
           statusCode: HttpStatus.CONFLICT
         };
       } else if (error instanceof BadRequestException) {
