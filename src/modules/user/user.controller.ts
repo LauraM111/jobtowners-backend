@@ -176,6 +176,9 @@ export class UserController {
         }
       };
     } catch (error) {
+      // Log the error for debugging
+      console.error('Error in registerCandidate:', error);
+      
       if (error instanceof ConflictException) {
         throw new HttpException({
           success: false,
@@ -183,9 +186,21 @@ export class UserController {
           data: null
         }, HttpStatus.CONFLICT);
       }
+      
+      // Handle Sequelize validation errors (duplicate email)
+      if (error.name === 'SequelizeValidationError' || 
+          error.name === 'SequelizeUniqueConstraintError' ||
+          (error.message && error.message.includes('Validation error'))) {
+        throw new HttpException({
+          success: false,
+          message: 'An account with this email already exists. Please try to reset your password if you forgot it.',
+          data: null
+        }, HttpStatus.CONFLICT);
+      }
+      
       throw new HttpException({
         success: false,
-        message: error.message,
+        message: error.message || 'Failed to register candidate',
         data: null
       }, HttpStatus.BAD_REQUEST);
     }
@@ -223,14 +238,39 @@ export class UserController {
       
       // Handle specific errors with custom responses
       if (error instanceof ConflictException) {
-        // Return a more user-friendly message for duplicate email/username
         return {
           success: false,
           message: 'An account with this email already exists. Please try to reset your password if you forgot it.',
           statusCode: HttpStatus.CONFLICT
         };
-      } else if (error instanceof BadRequestException) {
-        // Return validation errors
+      }
+      
+      // Handle Sequelize validation errors (duplicate email)
+      if (error.name === 'SequelizeValidationError' || 
+          error.name === 'SequelizeUniqueConstraintError' ||
+          (error.message && error.message.includes('Validation error'))) {
+        return {
+          success: false,
+          message: 'An account with this email already exists. Please try to reset your password if you forgot it.',
+          statusCode: HttpStatus.CONFLICT
+        };
+      }
+      
+      if (error instanceof BadRequestException) {
+        // Check if the BadRequestException is wrapping a duplicate email error
+        if (error.message && (
+            error.message.includes('Failed to register employer') ||
+            error.message.includes('email already exists') ||
+            error.message.includes('duplicate') ||
+            error.message.toLowerCase().includes('unique constraint')
+          )) {
+          return {
+            success: false,
+            message: 'An account with this email already exists. Please try to reset your password if you forgot it.',
+            statusCode: HttpStatus.CONFLICT
+          };
+        }
+        
         return {
           success: false,
           message: error.message,
