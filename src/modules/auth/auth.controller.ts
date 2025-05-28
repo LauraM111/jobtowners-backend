@@ -122,7 +122,7 @@ export class AuthController {
           data: {
             invalid: true,
             resendUrl: `${process.env.FRONTEND_URL}/resend-verification`
-          }
+          } 
         });
       }
     }
