@@ -31,7 +31,18 @@ export class AuthController {
   @UseGuards(LocalAuthGuard)
   async login(@Request() req, @Body() loginDto: LoginDto) {
     try {
+      console.log("req.user",req.user);
       // Check user status before proceeding with login
+      if (req.user.deletedAt != null) {
+        throw new UnauthorizedException({
+          success: false,
+          message: 'Your account is deleted. Please contact support at laura@jobtowners.com for assistance.',
+          accountStatus: 'inactive',
+          supportEmail: 'laura@jobtowners.com'
+        });
+      }
+
+
       if (req.user.status === 'inactive') {
         throw new UnauthorizedException({
           success: false,
@@ -127,6 +138,7 @@ export class AuthController {
       await this.tokenService.resendVerificationByEmail(email);
       return successResponse(null, 'Verification email sent. Please check your inbox.');
     } catch (error) {
+      console.log("error",error);
       if (error instanceof NotFoundException) {
         throw new NotFoundException('User not found');
       }

@@ -295,7 +295,7 @@ export class UserService {
    * Find a user by email (including password for auth)
    */
   async findByEmail(email: string): Promise<User> {
-    const user = await this.userModel.findOne({ where: { email } });
+    const user = await this.userModel.findOne({ where: { email }, paranoid: false });
 
     if (!user) {
       throw new NotFoundException(`User with email ${email} not found`);
