@@ -58,7 +58,7 @@ export class AuthController {
           success: false, 
           message: 'Please verify your email before logging in',
           emailVerificationRequired: true,
-          verificationUrl: `${process.env.FRONTEND_URL}/resend-verification`
+          verificationUrl: `<a href="${process.env.FRONTEND_URL}/resend-verification">here</a> or if link is not working, please copy and paste the link into your browser: ${process.env.FRONTEND_URL}/resend-verification`
         });
       }
       throw error;
@@ -143,6 +143,7 @@ export class AuthController {
   @ApiOperation({ summary: 'Request password reset' })
   @ApiResponse({ status: 200, description: 'Password reset email sent' })
   async forgotPassword(@Body('email') email: string) {
+    console.log('forgotPassword', email);
     const user = await this.authService.findUserByEmail(email);
     await this.tokenService.createPasswordResetToken(user);
     return successResponse(null, 'Password reset email sent');

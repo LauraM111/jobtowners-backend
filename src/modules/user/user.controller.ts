@@ -78,6 +78,8 @@ export class UserController {
       
       const user = await this.userService.findById(userId);
       
+      console.log("getProfile user",user);
+
       if (!user) {
         throw new NotFoundException('User not found');
       }
@@ -382,13 +384,10 @@ export class UserController {
       }
       
       const user = await this.userService.findById(id);
-      
-      if (!user) {
-        throw new NotFoundException(`User with ID ${id} not found`);
-      }
-      
+
       return successResponse(this.sanitizeUser(user), 'User retrieved successfully');
     } catch (error) {
+      console.log("error",error);
       console.error(`Error finding user ${id}:`, error.message);
       throw error;
     }
@@ -675,8 +674,80 @@ export class UserController {
     }
   }
 
+  @Get('admin/users/deleted-users')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserType.ADMIN)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Get all deleted users (Admin only)' })
+  @ApiResponse({ 
+    status: 200, 
+    description: 'List of all deleted users',
+    type: [User] 
+  })
+  async findDeletedUsers(
+    @Query('page', new DefaultValuePipe(1), ParseIntPipe) page: number,
+    @Query('limit', new DefaultValuePipe(10), ParseIntPipe) limit: number,
+    @Query('userTypes') userTypesString?: string
+  ) {
+    // Parse user types from query parameter
+    let userTypes: UserType[] = [];
+    
+    if (userTypesString) {
+      try {
+        // If it's a comma-separated string
+        userTypes = userTypesString.split(',') as UserType[];
+      } catch (error) {
+        throw new BadRequestException('Invalid userTypes format');
+      }
+    } else {
+      // Default to only candidates and employers if no userTypes specified
+      userTypes = [UserType.CANDIDATE, UserType.EMPLOYER];
+    }
+    
+    const { users, total } = await this.userService.findDeletedUsers(page, limit, userTypes);
+    
+    const result = users.map(user => {
+      const { password, ...userData } = user.toJSON();
+      return userData;
+    });
+    
+    return successResponse({
+      users: result,
+      pagination: {
+        page,
+        limit,
+        total,
+        totalPages: Math.ceil(total / limit)
+      }
+    }, 'Deleted users retrieved successfully');
+  }
+
+  @Patch('admin/users/deleted-users/:id/restore')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserType.ADMIN)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Restore a deleted user (Admin only)' })
+  @ApiParam({ name: 'id', description: 'User ID to restore' })
+  @ApiResponse({ 
+    status: 200, 
+    description: 'User has been successfully restored',
+    type: User 
+  })
+  @ApiResponse({ status: 404, description: 'User not found or not deleted' })
+  @ApiResponse({ status: 400, description: 'Bad request' })
+  async restoreDeletedUser(@Param('id') id: string) {
+    try {
+      const restoredUser = await this.userService.restoreDeletedUser(id);
+      return successResponse(this.sanitizeUser(restoredUser), 'User restored successfully');
+    } catch (error) {
+      console.error(`Error restoring user ${id}:`, error.message);
+      throw error;
+    }
+  }
+
   // Helper method to sanitize user data before sending response
   private sanitizeUser(user: any): any {
+    console.log("user",user)
     const sanitized = user.toJSON ? user.toJSON() : { ...user };
     delete sanitized.password;
     return sanitized;

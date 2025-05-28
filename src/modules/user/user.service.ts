@@ -277,14 +277,12 @@ export class UserService {
    * Find a user by ID
    */
   async findById(id: string): Promise<User> {
-    const user = await this.userModel.findByPk(id);
-    
-    if (!user) {
-      throw new NotFoundException(`User with ID ${id} not found`);
-    }
-    
+    const user = await this.userModel.findByPk(id, {
+      paranoid: false,  
+    });
     return user;
   }
+  
 
   /**
    * Find a user by ID (alias for findById)
@@ -546,5 +544,58 @@ export class UserService {
     await user.update(updateEmployerProfileDto);
     
     return this.findById(userId);
+  }
+
+  async findDeletedUsers(page: number = 1, limit: number = 10, userTypes: UserType[] = []) {
+    const offset = (page - 1) * limit;
+    
+    const whereClause: any = {
+      deletedAt: {
+        [Op.ne]: null // Only get soft-deleted users
+      }
+    };
+    
+    if (userTypes.length > 0) {
+      whereClause.userType = {
+        [Op.in]: userTypes
+      };
+    }
+    
+    const { count, rows } = await this.userModel.findAndCountAll({
+      where: whereClause,
+      limit,
+      offset,
+      order: [['deletedAt', 'DESC']], // Most recently deleted first
+      paranoid: false // Include soft-deleted records
+    });
+    
+    return {
+      users: rows,
+      total: count
+    };
+  }
+
+  async restoreDeletedUser(id: string): Promise<User> {
+    // First, find the deleted user (including soft deleted ones)
+    const deletedUser = await this.userModel.findOne({
+      where: { id },
+      paranoid: false // This includes soft deleted records
+    });
+
+    if (!deletedUser) {
+      throw new NotFoundException('User not found');
+    }
+
+    if (!deletedUser.deletedAt) {
+      throw new BadRequestException('User is not deleted and cannot be restored');
+    }
+
+    // Restore the user by setting deletedAt to null
+    await deletedUser.restore();
+
+    // Reload the user to get the updated data
+    await deletedUser.reload();
+
+    return deletedUser;
   }
 } 

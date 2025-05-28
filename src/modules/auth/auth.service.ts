@@ -84,7 +84,7 @@ export class AuthService {
       if (!user.isEmailVerified) {
         console.log(`Email not verified for user: ${user.id}`);
         // Instead of returning null, throw a specific error
-        throw new UnauthorizedException(`Please verify your email before logging in ${process.env.FRONTEND_URL}/resend-verification`);
+        throw new UnauthorizedException(`Please verify your email before logging in <a href="${process.env.FRONTEND_URL}/resend-verification">here</a> or if link is not working, please copy and paste the link into your browser: ${process.env.FRONTEND_URL}/resend-verification`);
       }
       
       // Use direct bcrypt comparison for maximum reliability
