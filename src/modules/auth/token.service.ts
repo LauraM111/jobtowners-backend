@@ -211,7 +211,7 @@ export class TokenService {
       throw error; // Re-throw the error to be handled by the controller
     }
   }
-
+ 
   /**
    * Validate a password reset token
    */
