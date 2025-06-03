@@ -225,11 +225,9 @@ export class TokenService {
     }
     
     const user = await this.userService.findById(tokenRecord.userId);
-    
     // if (!user.isEmailVerified) {
     //   throw new BadRequestException('Email not verified');
-    // }
-    
+    // }    
     return user;
   }
 
