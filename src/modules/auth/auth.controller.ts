@@ -43,14 +43,15 @@ export class AuthController {
       }
 
 
-      if (req.user.status === 'inactive') {
-        throw new UnauthorizedException({
-          success: false,
-          message: 'Your account is inactive. Please wait for approval or contact support at laura@jobtowners.com for assistance.',
-          accountStatus: 'inactive',
-          supportEmail: 'laura@jobtowners.com'
-        });
-      }
+      // if (req.user.status === 'inactive') {
+      //   throw new UnauthorizedException({
+      //     success: false,
+      //     message: 'Your account is inactive. Please wait for approval or contact support at laura@jobtowners.com for assistance.',
+      //     accountStatus: 'inactive',
+      //     supportEmail: 'laura@jobtowners.com'
+      //   });
+      // }
+      
       
       if (req.user.status === 'suspended') {
         throw new UnauthorizedException({

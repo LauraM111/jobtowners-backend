@@ -190,7 +190,7 @@ export class CompanyController {
       const allowedFields = [
         'companyName', 'website', 'foundedYear', 'companySize',
         'industry', 'description', 'socialLinks', 'contactEmail',
-        'contactPhone', 'address'
+        'contactPhone', 'address', 'status'
       ];
       
       // Create a clean DTO with only allowed fields
