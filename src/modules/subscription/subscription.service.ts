@@ -63,7 +63,33 @@ export class SubscriptionService {
       if (existingSubscription) {
         throw new BadRequestException('You already have an active subscription to this plan');
       }
+
+      // Handle zero-price plans or plans with skipStripe flag
+      if (plan.price === 0 || !plan.stripeProductId) {
+        const startDate = new Date();
+        // Create a subscription directly without Stripe integration
+        const subscription = await this.subscriptionModel.create({
+          userId: user.id,
+          planId: plan.id,
+          status: SubscriptionStatus.ACTIVE,
+          startDate,
+          endDate: this.calculateEndDate(startDate, plan.interval, plan.intervalCount || 1),
+        }, { transaction });
+
+        await transaction.commit();
+        return {
+          subscriptionId: subscription.id,
+          status: subscription.status,
+          planDetails: {
+            name: plan.name,
+            price: plan.price,
+            currency: plan.currency,
+            interval: plan.interval
+          }
+        };
+      }
       
+      // For paid plans, proceed with Stripe integration
       // Create or get Stripe customer
       let stripeCustomerId = user.stripeCustomerId;
       
@@ -261,9 +287,9 @@ export class SubscriptionService {
   }
 
   /**
-   * Calculate the end date based on interval and count
+   * Calculate subscription end date based on start date, interval and count
    */
-  private calculateEndDate(startDate: Date, interval: string, count: number): Date {
+  private calculateEndDate(startDate: Date, interval: string, count: number = 1): Date {
     const endDate = new Date(startDate);
     
     switch (interval) {
@@ -280,8 +306,7 @@ export class SubscriptionService {
         endDate.setFullYear(endDate.getFullYear() + count);
         break;
       default:
-        // Default to 30 days if interval is not recognized
-        endDate.setDate(endDate.getDate() + 30);
+        endDate.setMonth(endDate.getMonth() + count);
     }
     
     return endDate;
@@ -487,6 +512,71 @@ export class SubscriptionService {
     } catch (error) {
       this.logger.error(`Error getting payment methods: ${error.message}`);
       return [];
+    }
+  }
+
+  /**
+   * Find a subscription by ID with its plan
+   */
+  async findOne(id: string): Promise<Subscription> {
+    const subscription = await this.subscriptionModel.findOne({
+      where: { id },
+      include: [
+        {
+          model: this.subscriptionPlanModel,
+          as: 'plan'
+        }
+      ]
+    });
+
+    if (!subscription) {
+      throw new NotFoundException(`Subscription with ID ${id} not found`);
+    }
+
+    return subscription;
+  }
+
+  /**
+   * Confirm a free subscription without payment
+   */
+  async confirmFreeSubscription(userId: string, subscriptionId: string): Promise<Subscription> {
+    const transaction = await this.sequelize.transaction();
+    
+    try {
+      // Find the subscription with its plan
+      const subscription = await this.findOne(subscriptionId);
+      
+      if (!subscription) {
+        throw new NotFoundException('Subscription not found');
+      }
+
+      // Verify this is the user's subscription
+      if (subscription.userId !== userId) {
+        throw new BadRequestException('This subscription does not belong to the user');
+      }
+
+      // Verify this is actually a free plan
+      if (!subscription.plan || (subscription.plan.price !== 0 && !subscription.plan.skipStripe)) {
+        throw new BadRequestException('This is not a free subscription plan');
+      }
+
+      const startDate = new Date();
+      
+      // Update the subscription status
+      await subscription.update({
+        status: SubscriptionStatus.ACTIVE,
+        startDate,
+        endDate: this.calculateEndDate(startDate, subscription.plan.interval, subscription.plan.intervalCount),
+        lastPaymentDate: startDate
+      }, { transaction });
+      
+      await transaction.commit();
+      
+      return this.findSubscriptionById(subscription.id);
+    } catch (error) {
+      await transaction.rollback();
+      this.logger.error(`Error confirming free subscription: ${error.message}`);
+      throw error;
     }
   }
 } 

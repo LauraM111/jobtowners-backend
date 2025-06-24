@@ -202,6 +202,7 @@ async function bootstrap() {
         status VARCHAR(255) NOT NULL DEFAULT 'active',
         numberOfJobs INT NOT NULL DEFAULT 0,
         resumeViewsCount INT NOT NULL DEFAULT 0,
+        skipStripe BOOLEAN NOT NULL DEFAULT false,
         createdAt DATETIME NOT NULL,
         updatedAt DATETIME NOT NULL,
         deletedAt DATETIME

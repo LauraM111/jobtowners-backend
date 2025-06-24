@@ -118,6 +118,14 @@ export class SubscriptionPlan extends Model {
   })
   resumeViewsCount: number;
 
+  @Column({
+    type: DataType.BOOLEAN,
+    allowNull: false,
+    defaultValue: false,
+    comment: 'Skip Stripe integration for zero-price plans'
+  })
+  skipStripe: boolean;
+
   @BeforeCreate
   static generateId(instance: SubscriptionPlan) {
     if (!instance.id) {

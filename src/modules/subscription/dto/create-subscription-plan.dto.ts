@@ -1,5 +1,5 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { IsString, IsNumber, IsEnum, IsOptional, IsObject, Min, IsArray } from 'class-validator';
+import { IsString, IsNumber, IsEnum, IsOptional, IsObject, Min, IsArray, IsBoolean } from 'class-validator';
 import { PlanInterval, PlanStatus } from '../entities/subscription-plan.entity';
 
 export class CreateSubscriptionPlanDto {
@@ -53,4 +53,12 @@ export class CreateSubscriptionPlanDto {
   @Min(0)
   @IsOptional()
   resumeViewsCount?: number;
+
+  @ApiPropertyOptional({ 
+    description: 'Skip Stripe integration for zero-price plans. If true and price is 0, no Stripe product/price will be created.',
+    example: false
+  })
+  @IsBoolean()
+  @IsOptional()
+  skipStripe?: boolean;
 } 

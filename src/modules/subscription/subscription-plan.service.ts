@@ -24,26 +24,34 @@ export class SubscriptionPlanService {
     const transaction = await this.sequelize.transaction();
     
     try {
-      // Create product in Stripe
-      const stripeProduct = await this.stripeService.createProduct(
-        createSubscriptionPlanDto.name,
-        createSubscriptionPlanDto.description,
-      );
-      
-      // Create price in Stripe
-      const stripePrice = await this.stripeService.createPrice(
-        stripeProduct.id,
-        createSubscriptionPlanDto.price,
-        createSubscriptionPlanDto.currency || 'usd',
-        createSubscriptionPlanDto.interval,
-        createSubscriptionPlanDto.intervalCount || 1,
-      );
+      let stripeProductId: string | null = null;
+      let stripePriceId: string | null = null;
+
+      // Only create Stripe product and price if price > 0 and skipStripe is not true
+      if (createSubscriptionPlanDto.price > 0 || !createSubscriptionPlanDto.skipStripe) {
+        // Create product in Stripe
+        const stripeProduct = await this.stripeService.createProduct(
+          createSubscriptionPlanDto.name,
+          createSubscriptionPlanDto.description,
+        );
+        stripeProductId = stripeProduct.id;
+        
+        // Create price in Stripe
+        const stripePrice = await this.stripeService.createPrice(
+          stripeProduct.id,
+          createSubscriptionPlanDto.price,
+          createSubscriptionPlanDto.currency || 'usd',
+          createSubscriptionPlanDto.interval,
+          createSubscriptionPlanDto.intervalCount || 1,
+        );
+        stripePriceId = stripePrice.id;
+      }
       
       // Create subscription plan in database
       const subscriptionPlan = await this.subscriptionPlanModel.create({
         ...createSubscriptionPlanDto,
-        stripeProductId: stripeProduct.id,
-        stripePriceId: stripePrice.id,
+        stripeProductId,
+        stripePriceId,
       }, { transaction });
       
       await transaction.commit();

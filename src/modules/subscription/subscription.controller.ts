@@ -2,7 +2,7 @@ import {
   Controller, Get, Post, Body, Param, Delete, 
   UseGuards, Request, BadRequestException, Inject, forwardRef 
 } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
+import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth, ApiBody } from '@nestjs/swagger';
 import { SubscriptionService } from './subscription.service';
 import { CreateSubscriptionDto } from './dto/create-subscription.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
@@ -26,7 +26,7 @@ export class SubscriptionController {
   @Post()
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Create a new subscription (initiate payment)' })
-  @ApiResponse({ status: 201, description: 'Payment intent created successfully' })
+  @ApiResponse({ status: 200, description: 'Payment intent created successfully' })
   async create(@Request() req, @Body() createSubscriptionDto: CreateSubscriptionDto) {
     try {
       const result = await this.subscriptionService.create(req.user.sub, createSubscriptionDto);
@@ -38,21 +38,56 @@ export class SubscriptionController {
 
   @Post(':id/confirm')
   @ApiBearerAuth()
-  @ApiOperation({ summary: 'Confirm subscription payment' })
-  @ApiResponse({ status: 200, description: 'Subscription confirmed successfully' })
+  @ApiOperation({ summary: 'Confirm subscription payment or activate free plan' })
+  @ApiResponse({ status: 200, description: 'Subscription confirmed/activated successfully' })
+  @ApiBody({
+    schema: {
+      type: 'object',
+      properties: {
+        paymentIntentId: {
+          type: 'string',
+          description: 'Required for paid plans, not required for free plans'
+        }
+      },
+      required: []
+    }
+  })
   async confirmSubscription(
     @Request() req,
     @Param('id') id: string,
-    @Body('paymentIntentId') paymentIntentId: string
+    @Body('paymentIntentId') paymentIntentId?: string
   ) {
     try {
-      const subscription = await this.subscriptionService.confirmSubscription(
+      // First check if this is a free plan subscription
+      const subscription = await this.subscriptionService.findOne(id);
+      
+      if (!subscription) {
+        throw new BadRequestException('Subscription not found');
+      }
+
+      // If it's a free plan or skipStripe is true, confirm without payment
+      if (subscription.plan?.price === 0 || subscription.plan?.skipStripe) {
+        const confirmedSubscription = await this.subscriptionService.confirmFreeSubscription(
+          req.user.sub,
+          id
+        );
+        return successResponse(confirmedSubscription, 'Free subscription activated successfully');
+      }
+
+      // For paid plans, require paymentIntentId
+      if (!paymentIntentId) {
+        throw new BadRequestException('Payment intent ID is required for paid subscriptions');
+      }
+
+      // Proceed with paid subscription confirmation
+      const confirmedSubscription = await this.subscriptionService.confirmSubscription(
         req.user.sub,
         id,
         paymentIntentId
       );
-      return successResponse(subscription, 'Subscription confirmed successfully');
+      return successResponse(confirmedSubscription, 'Subscription confirmed successfully');
     } catch (error) {
+      this.logger.error(`Error confirming subscription: ${error.message}`);
       throw new BadRequestException(error.message);
     }
   }
