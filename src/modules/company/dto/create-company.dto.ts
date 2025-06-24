@@ -127,6 +127,55 @@ export class CreateCompanyDto {
   @IsOptional()
   businessRegistrationNumber?: string;
 
+  // Social Media Links
+  @ApiProperty({ 
+    description: 'Facebook page URL', 
+    example: 'https://facebook.com/company', 
+    required: false 
+  })
+  @IsOptional()
+  @IsUrl({
+    protocols: ['http', 'https'],
+    require_protocol: true
+  })
+  facebookUrl?: string;
+
+  @ApiProperty({ 
+    description: 'LinkedIn company page URL', 
+    example: 'https://linkedin.com/company/example', 
+    required: false 
+  })
+  @IsOptional()
+  @IsUrl({
+    protocols: ['http', 'https'],
+    require_protocol: true
+  })
+  linkedinUrl?: string;
+
+  @ApiProperty({ 
+    description: 'Twitter profile URL', 
+    example: 'https://twitter.com/company', 
+    required: false 
+  })
+  @IsOptional()
+  @IsUrl({
+    protocols: ['http', 'https'],
+    require_protocol: true
+  })
+  twitterUrl?: string;
+
+  @ApiProperty({ 
+    description: 'Instagram profile URL', 
+    example: 'https://instagram.com/company', 
+    required: false 
+  })
+  @IsOptional()
+  @IsUrl({
+    protocols: ['http', 'https'],
+    require_protocol: true
+  })
+  instagramUrl?: string;
+
   // Media & Branding
   @ApiProperty({ description: 'Logo image URL', example: 'https://www.acmecorp.com/logo.png', required: false })
   @IsUrl()

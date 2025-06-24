@@ -172,6 +172,30 @@ export class Company extends Model {
   })
   businessRegistrationNumber: string;
 
+  @Column({
+    type: DataType.STRING,
+    allowNull: true,
+  })
+  facebookUrl: string;
+
+  @Column({
+    type: DataType.STRING,
+    allowNull: true,
+  })
+  linkedinUrl: string;
+
+  @Column({
+    type: DataType.STRING,
+    allowNull: true,
+  })
+  twitterUrl: string;
+
+  @Column({
+    type: DataType.STRING,
+    allowNull: true,
+  })
+  instagramUrl: string;
+
   // Media & Branding
   @Column({
     type: DataType.STRING,
