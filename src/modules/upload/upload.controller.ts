@@ -1,9 +1,11 @@
-import { Controller, Post, UseInterceptors, UploadedFile, Body, BadRequestException } from '@nestjs/common';
+import { Controller, Post, UseInterceptors, UploadedFile, Body, BadRequestException, ParseFilePipe, MaxFileSizeValidator } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { ApiTags, ApiConsumes, ApiBody } from '@nestjs/swagger';
 import { UploadService } from './upload.service';
 import { successResponse } from '../../common/helpers/response.helper';
 import { Public } from '../auth/decorators/public.decorator';
+
+const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB in bytes
 
 @ApiTags('Upload')
 @Controller('upload')
@@ -12,7 +14,11 @@ export class UploadController {
 
   @Public()
   @Post('file')
-  @UseInterceptors(FileInterceptor('file'))
+  @UseInterceptors(FileInterceptor('file', {
+    limits: {
+      fileSize: MAX_FILE_SIZE // 10MB
+    }
+  }))
   @ApiConsumes('multipart/form-data')
   @ApiBody({
     schema: {
@@ -21,29 +27,46 @@ export class UploadController {
         file: {
           type: 'string',
           format: 'binary',
+          description: 'File to upload (max 10MB)'
         },
         folder: {
           type: 'string',
           example: 'documents',
+          description: 'Destination folder for the file'
         },
       },
     },
   })
   async uploadFile(
-    @UploadedFile() file: any,
+    @UploadedFile(
+      new ParseFilePipe({
+        validators: [
+          new MaxFileSizeValidator({ maxSize: MAX_FILE_SIZE })
+        ]
+      })
+    ) file: any,
     @Body('folder') folder: string = 'uploads',
   ) {
     if (!file) {
       throw new BadRequestException('No file uploaded');
     }
 
-    const fileUrl = await this.uploadService.uploadFile(
-      file.buffer,
-      folder,
-      file.originalname,
-    );
+    try {
+      const fileUrl = await this.uploadService.uploadFile(
+        file.buffer,
+        folder,
+        file.originalname,
+      );
 
-    return successResponse({ fileUrl }, 'File uploaded successfully');
+      return successResponse({ 
+        fileUrl,
+        size: file.size,
+        filename: file.originalname,
+        mimetype: file.mimetype
+      }, 'File uploaded successfully');
+    } catch (error) {
+      throw new BadRequestException(`File upload failed: ${error.message}`);
+    }
   }
 
   @Public()
