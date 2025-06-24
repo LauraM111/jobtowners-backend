@@ -608,7 +608,7 @@ export class UserController {
   @UseGuards(JwtAuthGuard)
   @ApiOperation({ summary: 'Update candidate profile' })
   @ApiResponse({ status: 200, description: 'Candidate profile updated successfully' })
-  @ApiResponse({ status: 400, description: 'Bad request' })
+  @ApiResponse({ status: 400, description: 'Bad request - Missing required documents or invalid data' })
   @ApiResponse({ status: 403, description: 'Forbidden - User is not a candidate' })
   @ApiBearerAuth()
   async updateCandidateProfile(
@@ -630,7 +630,23 @@ export class UserController {
       }
       
       const updatedUser = await this.userService.updateCandidateProfile(userId, updateCandidateProfileDto);
-      return successResponse(this.sanitizeUser(updatedUser), 'Candidate profile updated successfully');
+      
+      // Format the response to show document status
+      const response = {
+        ...this.sanitizeUser(updatedUser),
+        documents: {
+          studentPermit: {
+            provided: !!updatedUser.studentPermitImage,
+            url: updatedUser.studentPermitImage || null
+          },
+          proofOfEnrollment: {
+            provided: !!updatedUser.proofOfEnrollmentImage,
+            url: updatedUser.proofOfEnrollmentImage || null
+          }
+        }
+      };
+      
+      return successResponse(response, 'Candidate profile updated successfully');
     } catch (error) {
       if (error instanceof BadRequestException || error instanceof ForbiddenException) {
         throw error;

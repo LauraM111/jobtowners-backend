@@ -519,6 +519,25 @@ export class UserService {
     if (user.userType !== UserType.CANDIDATE) {
       throw new ForbiddenException('Only candidates can update candidate profiles');
     }
+
+    // Get current user data to check existing documents
+    const currentUser = await this.findById(userId);
+    const hasExistingStudentPermit = currentUser.studentPermitImage;
+    const hasExistingProofOfEnrollment = currentUser.proofOfEnrollmentImage;
+
+    // Check if at least one document is provided or already exists
+    const isProvidingStudentPermit = updateCandidateProfileDto.studentPermitImage;
+    const isProvidingProofOfEnrollment = updateCandidateProfileDto.proofOfEnrollmentImage;
+    
+    const hasAtLeastOneDocument = 
+      isProvidingStudentPermit || 
+      isProvidingProofOfEnrollment || 
+      hasExistingStudentPermit || 
+      hasExistingProofOfEnrollment;
+
+    if (!hasAtLeastOneDocument) {
+      throw new BadRequestException('At least one document (Student Permit or Proof of Enrollment) must be provided');
+    }
     
     // Update user with provided data
     await user.update(updateCandidateProfileDto);

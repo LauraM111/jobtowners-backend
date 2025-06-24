@@ -122,6 +122,11 @@ export class CreateCompanyDto {
   @IsOptional()
   registrationNumber?: string;
 
+  @ApiProperty({ description: 'Business registration number', example: 'BRN123456', required: false })
+  @IsString()
+  @IsOptional()
+  businessRegistrationNumber?: string;
+
   // Media & Branding
   @ApiProperty({ description: 'Logo image URL', example: 'https://www.acmecorp.com/logo.png', required: false })
   @IsUrl()

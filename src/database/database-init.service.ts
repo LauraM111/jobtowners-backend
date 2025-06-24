@@ -181,6 +181,7 @@ export class DatabaseInitService implements OnModuleInit {
           gstNumber VARCHAR(255),
           panNumber VARCHAR(255),
           registrationNumber VARCHAR(255),
+          businessRegistrationNumber VARCHAR(255),
           logoUrl VARCHAR(255),
           coverImageUrl VARCHAR(255),
           status VARCHAR(255) NOT NULL DEFAULT 'active',

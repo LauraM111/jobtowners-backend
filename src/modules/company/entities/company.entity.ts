@@ -166,6 +166,12 @@ export class Company extends Model {
   })
   registrationNumber: string;
 
+  @Column({
+    type: DataType.STRING,
+    allowNull: true,
+  })
+  businessRegistrationNumber: string;
+
   // Media & Branding
   @Column({
     type: DataType.STRING,
@@ -182,7 +188,7 @@ export class Company extends Model {
   // Status & Meta
   @Column({
     type: DataType.STRING,
-    defaultValue: CompanyStatus.ACTIVE,
+    defaultValue: CompanyStatus.INACTIVE,
     allowNull: false,
     validate: {
       isIn: [Object.values(CompanyStatus)]
