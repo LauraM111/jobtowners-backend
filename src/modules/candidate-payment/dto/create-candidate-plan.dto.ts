@@ -1,4 +1,4 @@
-import { IsNotEmpty, IsNumber, IsString, IsOptional, Min } from 'class-validator';
+import { IsNotEmpty, IsNumber, IsString, IsOptional, Min, IsBoolean } from 'class-validator';
 import { ApiProperty } from '@nestjs/swagger';
 
 export class CreateCandidatePlanDto {
@@ -26,4 +26,13 @@ export class CreateCandidatePlanDto {
   @IsNumber()
   @Min(1)
   dailyApplicationLimit: number;
+
+  @ApiProperty({ 
+    description: 'Skip Stripe integration for zero-price plans. If true and price is 0, no Stripe product/price will be created.',
+    required: false,
+    default: false
+  })
+  @IsOptional()
+  @IsBoolean()
+  skipStripe?: boolean;
 } 

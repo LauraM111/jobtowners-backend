@@ -41,29 +41,32 @@ export class CandidatePaymentService {
     const transaction = await this.sequelize.transaction();
     
     try {
-      // Create Stripe product and price
-      const product = await this.stripe.products.create({
-        name: createCandidatePlanDto.name,
-        description: createCandidatePlanDto.description || 'Candidate job application plan',
-      });
-      
-      // Create a one-time price (not recurring)
-      const price = await this.stripe.prices.create({
-        product: product.id,
-        unit_amount: Math.round(createCandidatePlanDto.price * 100), // Convert to cents
-        currency: createCandidatePlanDto.currency || 'usd',
-      });
+      let stripeProductId: string | null = null;
+      let stripePriceId: string | null = null;
+
+      // Only create Stripe product and price if price > 0 and skipStripe is not true
+      if (createCandidatePlanDto.price > 0 && !createCandidatePlanDto.skipStripe) {
+        // Create product in Stripe
+        const product = await this.stripe.products.create({
+          name: createCandidatePlanDto.name,
+          description: createCandidatePlanDto.description || 'Candidate job application plan',
+        });
+        stripeProductId = product.id;
+        
+        // Create a one-time price (not recurring)
+        const price = await this.stripe.prices.create({
+          product: product.id,
+          unit_amount: Math.round(createCandidatePlanDto.price * 100), // Convert to cents
+          currency: createCandidatePlanDto.currency || 'usd',
+        });
+        stripePriceId = price.id;
+      }
       
       // Create plan in database
       const plan = await this.candidatePlanModel.create({
-        name: createCandidatePlanDto.name,
-        description: createCandidatePlanDto.description,
-        price: createCandidatePlanDto.price,
-        currency: createCandidatePlanDto.currency || 'usd',
-        dailyApplicationLimit: createCandidatePlanDto.dailyApplicationLimit,
-        stripeProductId: product.id,
-        stripePriceId: price.id,
-        status: 'active',
+        ...createCandidatePlanDto,
+        stripeProductId,
+        stripePriceId,
       }, { transaction });
       
       await transaction.commit();
@@ -184,119 +187,87 @@ export class CandidatePaymentService {
   }
 
   /**
-   * Create a payment intent for a plan
+   * Create a payment intent for a candidate plan
    */
   async createPaymentIntent(userId: string, createPaymentIntentDto: CreatePaymentIntentDto): Promise<any> {
     const transaction = await this.sequelize.transaction();
     
     try {
-      // Get the plan
-      const plan = await this.candidatePlanModel.findByPk(createPaymentIntentDto.planId, { transaction });
-      
-      if (!plan) {
-        throw new NotFoundException(`Candidate plan with ID ${createPaymentIntentDto.planId} not found`);
-      }
-      
-      // Get the user
-      const user = await this.userModel.findByPk(userId, { transaction });
-      
+      // Find the user
+      const user = await this.userModel.findByPk(userId);
       if (!user) {
-        throw new NotFoundException(`User with ID ${userId} not found`);
+        throw new NotFoundException('User not found');
       }
-      
-      // Check if user already has a pending order for this plan
-      const pendingOrder = await this.candidateOrderModel.findOne({
-        where: {
-          userId,
-          planId: plan.id,
-          status: 'pending'
-        },
-        transaction
-      });
-      
-      // If there's a pending order with a payment intent, return that
-      if (pendingOrder && pendingOrder.stripePaymentIntentId) {
-        try {
-          const existingIntent = await this.stripe.paymentIntents.retrieve(pendingOrder.stripePaymentIntentId);
-          
-          // If the intent is still valid and not succeeded, return it
-          if (existingIntent.status !== 'succeeded' && existingIntent.status !== 'canceled') {
-            await transaction.commit();
-            return {
-              clientSecret: existingIntent.client_secret,
-              plan: {
-                id: plan.id,
-                name: plan.name,
-                description: plan.description,
-                price: plan.price,
-                currency: plan.currency
-              }
-            };
-          }
-        } catch (error) {
-          // If the intent doesn't exist anymore, continue to create a new one
-          this.logger.warn(`Error retrieving existing payment intent: ${error.message}`);
-        }
+
+      // Find the plan
+      const plan = await this.candidatePlanModel.findByPk(createPaymentIntentDto.planId);
+      if (!plan) {
+        throw new NotFoundException('Plan not found');
       }
-      
-      // Create a customer if the user doesn't have one
-      let customerId = user.get('stripeCustomerId');
-      
-      if (!customerId) {
-        const customer = await this.stripe.customers.create({
-          email: user.get('email'),
-          name: `${user.get('firstName')} ${user.get('lastName')}`,
-          metadata: {
-            userId: user.id
-          }
-        });
-        
-        customerId = customer.id;
-        
-        // Update user with Stripe customer ID
-        await user.update({ stripeCustomerId: customerId }, { transaction });
-      }
-      
-      // Create a payment intent
-      const paymentIntent = await this.stripe.paymentIntents.create({
-        amount: Math.round(plan.price * 100), // Convert to cents
-        currency: plan.currency,
-        customer: customerId,
-        metadata: {
-          userId: userId,
-          planId: plan.id
-        }
-      });
-      
-      // Create or update order
-      if (pendingOrder) {
-        await pendingOrder.update({
-          stripePaymentIntentId: paymentIntent.id,
-          stripeCustomerId: customerId
-        }, { transaction });
-      } else {
-        await this.candidateOrderModel.create({
-          userId,
+
+      // If it's a free plan or skipStripe is true, create order directly without Stripe
+      if (plan.price === 0 || plan.skipStripe) {
+        const order = await this.candidateOrderModel.create({
+          userId: user.id,
           planId: plan.id,
           amount: plan.price,
           currency: plan.currency,
-          status: 'pending',
-          stripePaymentIntentId: paymentIntent.id,
-          stripeCustomerId: customerId
+          status: 'completed',
+          paymentDate: new Date()
         }, { transaction });
+
+        // Create or update application limit
+        await this.updateApplicationLimit(user.id, plan.dailyApplicationLimit, transaction);
+
+        await transaction.commit();
+        return { 
+          clientSecret: null,
+          plan,
+          order,
+          message: 'Free plan activated successfully'
+        };
       }
+
+      // For paid plans, proceed with Stripe integration
+      let stripeCustomerId = user.stripeCustomerId;
+      
+      if (!stripeCustomerId) {
+        const customer = await this.stripe.customers.create({
+          email: user.email,
+          name: `${user.firstName} ${user.lastName}`,
+        });
+        stripeCustomerId = customer.id;
+        
+        await user.update({ stripeCustomerId }, { transaction });
+      }
+      
+      // Create payment intent
+      const paymentIntent = await this.stripe.paymentIntents.create({
+        amount: Math.round(plan.price * 100),
+        currency: plan.currency,
+        customer: stripeCustomerId,
+        metadata: {
+          planId: plan.id,
+          userId: user.id
+        }
+      });
+      
+      // Create pending order
+      await this.candidateOrderModel.create({
+        userId: user.id,
+        planId: plan.id,
+        amount: plan.price,
+        currency: plan.currency,
+        status: 'pending',
+        stripePaymentIntentId: paymentIntent.id,
+        stripeCustomerId
+      }, { transaction });
       
       await transaction.commit();
       
       return {
         clientSecret: paymentIntent.client_secret,
-        plan: {
-          id: plan.id,
-          name: plan.name,
-          description: plan.description,
-          price: plan.price,
-          currency: plan.currency
-        }
+        plan
       };
     } catch (error) {
       await transaction.rollback();
@@ -800,5 +771,92 @@ export class CandidatePaymentService {
     // Implement according to your database structure
     // For example:
     return this.candidatePlanModel.update(updateCandidatePlanDto, { where: { id } });
+  }
+
+  /**
+   * Update application limit for a user
+   */
+  private async updateApplicationLimit(
+    userId: string,
+    dailyLimit: number,
+    transaction: any
+  ): Promise<ApplicationLimit> {
+    // Get or create application limit for the user
+    const [limit, created] = await this.applicationLimitModel.findOrCreate({
+      where: { userId },
+      defaults: {
+        userId,
+        dailyLimit,
+        applicationsUsedToday: 0,
+        lastResetDate: new Date(),
+        hasPaid: true
+      },
+      transaction
+    });
+
+    if (!created) {
+      // Update existing limit
+      await limit.update({
+        dailyLimit,
+        hasPaid: true,
+        // Reset applications if it's a new day
+        ...(new Date().toDateString() !== new Date(limit.lastResetDate).toDateString() && {
+          applicationsUsedToday: 0,
+          lastResetDate: new Date()
+        })
+      }, { transaction });
+    }
+
+    return limit;
+  }
+
+  /**
+   * Activate a free plan or plan with skipStripe
+   */
+  async activateFreePlan(userId: string, planId: string): Promise<{ order: CandidateOrder; applicationLimit: ApplicationLimit }> {
+    const transaction = await this.sequelize.transaction();
+    
+    try {
+      // Find the user
+      const user = await this.userModel.findByPk(userId);
+      if (!user) {
+        throw new NotFoundException('User not found');
+      }
+
+      // Find the plan
+      const plan = await this.candidatePlanModel.findByPk(planId);
+      if (!plan) {
+        throw new NotFoundException('Plan not found');
+      }
+
+      // Verify this is actually a free plan or skipStripe plan
+      if (Number(plan.price) !== 0 && !plan.skipStripe) {
+        throw new BadRequestException('This is not a free plan or skipStripe plan');
+      }
+
+      // Create completed order
+      const order = await this.candidateOrderModel.create({
+        userId: user.id,
+        planId: plan.id,
+        amount: plan.price,
+        currency: plan.currency,
+        status: 'completed',
+        paymentDate: new Date()
+      }, { transaction });
+
+      // Update application limit
+      const applicationLimit = await this.updateApplicationLimit(
+        user.id,
+        plan.dailyApplicationLimit,
+        transaction
+      );
+
+      await transaction.commit();
+      return { order, applicationLimit };
+    } catch (error) {
+      await transaction.rollback();
+      this.logger.error(`Error activating free plan: ${error.message}`);
+      throw error;
+    }
   }
 } 

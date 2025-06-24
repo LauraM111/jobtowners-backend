@@ -134,20 +134,45 @@ export class CandidatePaymentController {
   @Post('create-payment-intent')
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
-  @ApiOperation({ summary: 'Create a payment intent for a candidate plan' })
-  @ApiResponse({ status: 200, description: 'Payment intent created successfully' })
+  @ApiOperation({ summary: 'Create a payment intent for a candidate plan or activate free plan' })
+  @ApiResponse({ status: 200, description: 'Payment intent created or free plan activated successfully' })
   async createPaymentIntent(
     @Request() req,
     @Body() createPaymentIntentDto: CreatePaymentIntentDto
   ) {
     try {
-      const { clientSecret, plan } = await this.candidatePaymentService.createPaymentIntent(
+      // Find the plan first
+      const plan = await this.candidatePaymentService.findPlanById(createPaymentIntentDto.planId);
+      
+      if (!plan) {
+        throw new BadRequestException('Plan not found');
+      }
+
+      // If it's a free plan (price = 0) or skipStripe is true, activate it immediately
+      if (Number(plan.price) === 0 || plan.skipStripe) {
+        const result = await this.candidatePaymentService.activateFreePlan(
+          req.user.sub,
+          createPaymentIntentDto.planId
+        );
+        return successResponse(
+          { 
+            clientSecret: null,
+            plan,
+            order: result.order,
+            applicationLimit: result.applicationLimit
+          },
+          'Free plan activated successfully'
+        );
+      }
+
+      // For paid plans, proceed with payment intent creation
+      const { clientSecret, plan: planDetails } = await this.candidatePaymentService.createPaymentIntent(
         req.user.sub,
         createPaymentIntentDto
       );
       
       return successResponse(
-        { clientSecret, plan },
+        { clientSecret, plan: planDetails },
         'Payment intent created successfully'
       );
     } catch (error) {

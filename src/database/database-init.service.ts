@@ -327,6 +327,7 @@ export class DatabaseInitService implements OnModuleInit {
           stripePriceId VARCHAR(255),
           dailyApplicationLimit INT NOT NULL DEFAULT 15,
           status VARCHAR(255) NOT NULL DEFAULT 'active',
+          skipStripe BOOLEAN NOT NULL DEFAULT false,
           createdAt DATETIME NOT NULL,
           updatedAt DATETIME NOT NULL,
           deletedAt DATETIME

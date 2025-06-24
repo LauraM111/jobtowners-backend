@@ -26,7 +26,7 @@ export class SubscriptionController {
   @Post()
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Create a new subscription (initiate payment)' })
-  @ApiResponse({ status: 200, description: 'Payment intent created successfully' })
+  @ApiResponse({ status: 201, description: 'Payment intent created successfully' })
   async create(@Request() req, @Body() createSubscriptionDto: CreateSubscriptionDto) {
     try {
       const result = await this.subscriptionService.create(req.user.sub, createSubscriptionDto);

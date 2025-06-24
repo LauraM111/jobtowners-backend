@@ -67,6 +67,13 @@ export class CandidatePlan extends Model {
   })
   status: string;
 
+  @Column({
+    type: DataType.BOOLEAN,
+    allowNull: false,
+    defaultValue: false
+  })
+  skipStripe: boolean;
+
   @HasMany(() => CandidateOrder)
   orders: CandidateOrder[];
 
