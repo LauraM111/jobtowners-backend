@@ -11,6 +11,8 @@ import { NestExpressApplication } from '@nestjs/platform-express';
 import { join } from 'path';
 import { exec } from 'child_process';
 import { promisify } from 'util';
+import { json, urlencoded } from 'express';
+import { HttpExceptionFilter } from './common/filters/http-exception.filter';
 
 // Load .env file
 dotenv.config();
@@ -43,8 +45,8 @@ async function bootstrap() {
     app.use('/api/v1/webhooks/stripe', bodyParser.raw({ type: 'application/json' }));
   
     // Use JSON body parser for all other routes
-    app.use(bodyParser.json({ limit: '50mb' }));
-    app.use(bodyParser.urlencoded({ extended: true, limit: '50mb' }));
+    app.use(json({ limit: '10mb' }));
+    app.use(urlencoded({ extended: true, limit: '10mb' }));
   
     const configService = app.get(ConfigService);
   
@@ -76,6 +78,9 @@ async function bootstrap() {
       }),
     );
   
+    // Set up global exception filter
+    app.useGlobalFilters(new HttpExceptionFilter());
+  
     // Setup Swagger
     const config = new DocumentBuilder()
       .setTitle('JobTowners API')
@@ -84,10 +89,10 @@ async function bootstrap() {
       .addBearerAuth()
       .build();
     const document = SwaggerModule.createDocument(app, config);
-    SwaggerModule.setup('api/docs', app, document);
+    SwaggerModule.setup('api', app, document);
   
     // Get port from config
-    const port = configService.get<number>('PORT') || 3000;
+    const port = configService.get<number>('PORT') || 8080;
   
     await app.listen(port);
     console.log(`Application is running on: ${await app.getUrl()}`);
