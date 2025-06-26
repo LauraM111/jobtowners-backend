@@ -45,13 +45,13 @@ async function bootstrap() {
     app.use('/api/v1/webhooks/stripe', bodyParser.raw({ type: 'application/json' }));
   
     // Use JSON body parser for all other routes with increased limits
-    app.use(json({ limit: '10mb' }));
-    app.use(urlencoded({ extended: true, limit: '10mb' }));
+    app.use(json({ limit: '100mb' }));
+    app.use(urlencoded({ extended: true, limit: '100mb' }));
 
     // Configure global request size limit
-    app.use(bodyParser.json({ limit: '10mb' }));
-    app.use(bodyParser.urlencoded({ limit: '10mb', extended: true }));
-    app.use(bodyParser.raw({ limit: '10mb' }));
+    app.use(bodyParser.json({ limit: '100mb' }));
+    app.use(bodyParser.urlencoded({ limit: '100mb', extended: true }));
+    app.use(bodyParser.raw({ limit: '100mb' }));
   
     const configService = app.get(ConfigService);
   

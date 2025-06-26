@@ -5,7 +5,7 @@ import { UploadService } from './upload.service';
 import { successResponse } from '../../common/helpers/response.helper';
 import { Public } from '../auth/decorators/public.decorator';
 
-const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB in bytes
+const MAX_FILE_SIZE = 10 * 1024 * 1024; // 100mb in bytes
 
 @ApiTags('Upload')
 @Controller('upload')
@@ -16,7 +16,7 @@ export class UploadController {
   @Post('file')
   @UseInterceptors(FileInterceptor('file', {
     limits: {
-      fileSize: MAX_FILE_SIZE, // 10MB
+      fileSize: MAX_FILE_SIZE, // 100mb
       files: 1
     },
     fileFilter: (req, file, cb) => {
@@ -34,7 +34,7 @@ export class UploadController {
         file: {
           type: 'string',
           format: 'binary',
-          description: 'File to upload (max 10MB)'
+          description: 'File to upload (max 100mb)'
         },
         folder: {
           type: 'string',
