@@ -1,11 +1,23 @@
 import { ApiProperty } from '@nestjs/swagger';
 import { 
   IsString, IsNotEmpty, IsOptional, IsEmail, 
-  IsUrl, IsNumber, IsEnum, Min, Max 
+  IsUrl, IsNumber, IsEnum, Min, Max, ValidateIf,
+  ValidateNested
 } from 'class-validator';
 import { CompanyStatus } from '../enums/company-status.enum';
+import { RequireTwoBusinessVerificationFields } from '../validators/business-verification.validator';
 
+@RequireTwoBusinessVerificationFields({
+  message: 'Please provide at least 2 of the following for business verification:\n' +
+           '✅ A physical business address\n' +
+           '✅ A website\n' +
+           '✅ Social media page\n' +
+           '✅ A business registration number'
+})
 export class CreateCompanyDto {
+  @IsOptional()
+  verificationFields?: any;
+
   // Basic Company Information
   @ApiProperty({ description: 'Name of the company', example: 'Acme Corporation' })
   @IsString()
@@ -17,29 +29,32 @@ export class CreateCompanyDto {
   @IsOptional()
   slug?: string;
 
-  @ApiProperty({ description: 'Short description of the company', example: 'Leading provider of innovative solutions', required: false })
+  @ApiProperty({ description: 'Short description of the company', example: 'Leading provider of innovative solutions' })
   @IsString()
   @IsOptional()
   description?: string;
 
-  @ApiProperty({ description: 'Industry type', example: 'Technology', required: false })
+  @ApiProperty({ description: 'Industry type', example: 'Technology' })
   @IsString()
   @IsOptional()
   industryType?: string;
 
-  @ApiProperty({ description: 'Company website URL', example: 'https://www.acmecorp.com', required: false })
+  @ApiProperty({ 
+    description: 'Company website URL (Required for business verification if no other verification methods provided)', 
+    example: 'https://www.acmecorp.com'
+  })
   @IsUrl()
   @IsOptional()
   website?: string;
 
-  @ApiProperty({ description: 'Year of establishment', example: 2010, required: false })
+  @ApiProperty({ description: 'Year of establishment', example: 2010 })
   @IsNumber()
   @Min(1800)
   @Max(new Date().getFullYear())
   @IsOptional()
   foundedYear?: number;
 
-  @ApiProperty({ description: 'Company size', example: '51-200', required: false })
+  @ApiProperty({ description: 'Company size', example: '51-200' })
   @IsString()
   @IsOptional()
   companySize?: string;
@@ -50,7 +65,7 @@ export class CreateCompanyDto {
   @IsNotEmpty()
   email: string;
 
-  @ApiProperty({ description: 'Contact number', example: '+1234567890', required: false })
+  @ApiProperty({ description: 'Contact number', example: '+1234567890' })
   @IsString()
   @IsOptional()
   phone?: string;
@@ -65,36 +80,55 @@ export class CreateCompanyDto {
   @IsOptional()
   contactPerson?: string;
 
-  // Address
-  @ApiProperty({ description: 'Address line 1', example: '123 Main Street' })
+  // Address (Required for business verification if no other verification methods provided)
+  @ApiProperty({ 
+    description: 'Physical business address line 1 (Required for business verification if no other verification methods provided)', 
+    example: '123 Main Street' 
+  })
   @IsString()
-  @IsNotEmpty()
-  addressLine1: string;
+  @IsOptional()
+  addressLine1?: string;
 
-  @ApiProperty({ description: 'Address line 2', example: 'Suite 456', required: false })
+  @ApiProperty({ description: 'Address line 2', example: 'Suite 456' })
   @IsString()
   @IsOptional()
   addressLine2?: string;
 
-  @ApiProperty({ description: 'City', example: 'San Francisco' })
+  @ApiProperty({ 
+    description: 'City (Required if address is provided)', 
+    example: 'San Francisco' 
+  })
+  @ValidateIf(o => !!o.addressLine1)
   @IsString()
   @IsNotEmpty()
-  city: string;
+  city?: string;
 
-  @ApiProperty({ description: 'State', example: 'California' })
+  @ApiProperty({ 
+    description: 'State (Required if address is provided)', 
+    example: 'California' 
+  })
+  @ValidateIf(o => !!o.addressLine1)
   @IsString()
   @IsNotEmpty()
-  state: string;
+  state?: string;
 
-  @ApiProperty({ description: 'Country', example: 'USA' })
+  @ApiProperty({ 
+    description: 'Country (Required if address is provided)', 
+    example: 'USA' 
+  })
+  @ValidateIf(o => !!o.addressLine1)
   @IsString()
   @IsNotEmpty()
-  country: string;
+  country?: string;
 
-  @ApiProperty({ description: 'Postal code', example: '94105' })
+  @ApiProperty({ 
+    description: 'Postal code (Required if address is provided)', 
+    example: '94105' 
+  })
+  @ValidateIf(o => !!o.addressLine1)
   @IsString()
   @IsNotEmpty()
-  postalCode: string;
+  postalCode?: string;
 
   @ApiProperty({ description: 'Latitude', example: 37.7749, required: false })
   @IsNumber()
@@ -122,16 +156,19 @@ export class CreateCompanyDto {
   @IsOptional()
   registrationNumber?: string;
 
-  @ApiProperty({ description: 'Business registration number', example: 'BRN123456', required: false })
+  // Business Registration
+  @ApiProperty({ 
+    description: 'Business registration number (Required for business verification if no other verification methods provided)', 
+    example: 'BRN123456' 
+  })
   @IsString()
   @IsOptional()
   businessRegistrationNumber?: string;
 
-  // Social Media Links
+  // Social Media Links (Any one social media link is sufficient for business verification)
   @ApiProperty({ 
-    description: 'Facebook page URL', 
-    example: 'https://facebook.com/company', 
-    required: false 
+    description: 'Facebook page URL (Any one social media link is sufficient for business verification)', 
+    example: 'https://facebook.com/company'
   })
   @IsOptional()
   @IsUrl({
@@ -141,9 +178,8 @@ export class CreateCompanyDto {
   facebookUrl?: string;
 
   @ApiProperty({ 
-    description: 'LinkedIn company page URL', 
-    example: 'https://linkedin.com/company/example', 
-    required: false 
+    description: 'LinkedIn company page URL (Any one social media link is sufficient for business verification)', 
+    example: 'https://linkedin.com/company/example'
   })
   @IsOptional()
   @IsUrl({
@@ -153,9 +189,8 @@ export class CreateCompanyDto {
   linkedinUrl?: string;
 
   @ApiProperty({ 
-    description: 'Twitter profile URL', 
-    example: 'https://twitter.com/company', 
-    required: false 
+    description: 'Twitter profile URL (Any one social media link is sufficient for business verification)', 
+    example: 'https://twitter.com/company'
   })
   @IsOptional()
   @IsUrl({
@@ -165,9 +200,8 @@ export class CreateCompanyDto {
   twitterUrl?: string;
 
   @ApiProperty({ 
-    description: 'Instagram profile URL', 
-    example: 'https://instagram.com/company', 
-    required: false 
+    description: 'Instagram profile URL (Any one social media link is sufficient for business verification)', 
+    example: 'https://instagram.com/company'
   })
   @IsOptional()
   @IsUrl({
