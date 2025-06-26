@@ -16,7 +16,14 @@ export class UploadController {
   @Post('file')
   @UseInterceptors(FileInterceptor('file', {
     limits: {
-      fileSize: MAX_FILE_SIZE // 10MB
+      fileSize: MAX_FILE_SIZE, // 10MB
+      files: 1
+    },
+    fileFilter: (req, file, cb) => {
+      if (file.size && file.size > MAX_FILE_SIZE) {
+        cb(new BadRequestException(`File size too large. Maximum size is ${MAX_FILE_SIZE / (1024 * 1024)}MB`), false);
+      }
+      cb(null, true);
     }
   }))
   @ApiConsumes('multipart/form-data')
