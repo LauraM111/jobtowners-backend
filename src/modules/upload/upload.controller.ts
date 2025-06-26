@@ -1,11 +1,11 @@
-import { Controller, Post, UseInterceptors, UploadedFile, Body, BadRequestException, ParseFilePipe, MaxFileSizeValidator, PayloadTooLargeException } from '@nestjs/common';
+import { Controller, Post, UseInterceptors, UploadedFile, Body, BadRequestException, ParseFilePipe, MaxFileSizeValidator, PayloadTooLargeException, HttpStatus } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { ApiTags, ApiConsumes, ApiBody } from '@nestjs/swagger';
 import { UploadService } from './upload.service';
 import { successResponse } from '../../common/helpers/response.helper';
 import { Public } from '../auth/decorators/public.decorator';
 
-const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB in bytes
+const MAX_FILE_SIZE = 100 * 1024 * 1024; // 100MB in bytes
 
 @ApiTags('Upload')
 @Controller('upload')
@@ -47,12 +47,8 @@ export class UploadController {
   async uploadFile(
     @UploadedFile(
       new ParseFilePipe({
-        validators: [
-          new MaxFileSizeValidator({ 
-            maxSize: MAX_FILE_SIZE,
-            message: 'File size exceeds the 10MB limit. Please upload a smaller file.'
-          })
-        ]
+        errorHttpStatusCode: HttpStatus.PAYLOAD_TOO_LARGE,
+        validators: [new MaxFileSizeValidator({ maxSize: MAX_FILE_SIZE })],
       })
     ) file: any,
     @Body('folder') folder: string = 'uploads',
