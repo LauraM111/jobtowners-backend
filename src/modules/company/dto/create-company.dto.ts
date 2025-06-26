@@ -2,21 +2,15 @@ import { ApiProperty } from '@nestjs/swagger';
 import { 
   IsString, IsNotEmpty, IsOptional, IsEmail, 
   IsUrl, IsNumber, IsEnum, Min, Max, ValidateIf,
-  ValidateNested
+  Validate
 } from 'class-validator';
 import { CompanyStatus } from '../enums/company-status.enum';
 import { RequireTwoBusinessVerificationFields } from '../validators/business-verification.validator';
 
-@RequireTwoBusinessVerificationFields({
-  message: 'Please provide at least 2 of the following for business verification:\n' +
-           '✅ A physical business address\n' +
-           '✅ A website\n' +
-           '✅ Social media page\n' +
-           '✅ A business registration number'
-})
 export class CreateCompanyDto {
+  @Validate(RequireTwoBusinessVerificationFields)
   @IsOptional()
-  verificationFields?: any;
+  businessVerification?: boolean;
 
   // Basic Company Information
   @ApiProperty({ description: 'Name of the company', example: 'Acme Corporation' })
