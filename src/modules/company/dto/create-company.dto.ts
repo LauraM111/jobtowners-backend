@@ -167,7 +167,6 @@ export class CreateCompanyDto {
   @IsOptional()
   @IsUrl({
     protocols: ['http', 'https'],
-    require_protocol: true
   })
   facebookUrl?: string;
 
@@ -178,7 +177,6 @@ export class CreateCompanyDto {
   @IsOptional()
   @IsUrl({
     protocols: ['http', 'https'],
-    require_protocol: true
   })
   linkedinUrl?: string;
 
@@ -189,7 +187,6 @@ export class CreateCompanyDto {
   @IsOptional()
   @IsUrl({
     protocols: ['http', 'https'],
-    require_protocol: true
   })
   twitterUrl?: string;
 
@@ -200,7 +197,6 @@ export class CreateCompanyDto {
   @IsOptional()
   @IsUrl({
     protocols: ['http', 'https'],
-    require_protocol: true
   })
   instagramUrl?: string;
 
