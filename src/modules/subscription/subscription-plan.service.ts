@@ -112,38 +112,51 @@ export class SubscriptionPlanService {
     try {
       const subscriptionPlan = await this.findOne(id);
       
-      // Update product in Stripe if name or description changed
-      if (updateSubscriptionPlanDto.name || updateSubscriptionPlanDto.description) {
-        await this.stripeService.updateProduct(
-          subscriptionPlan.stripeProductId,
-          updateSubscriptionPlanDto.name || subscriptionPlan.name,
-          updateSubscriptionPlanDto.description || subscriptionPlan.description,
-        );
-      }
-      
-      // If price or interval changed, create a new price in Stripe
-      if (
-        updateSubscriptionPlanDto.price !== undefined ||
-        updateSubscriptionPlanDto.interval !== undefined ||
-        updateSubscriptionPlanDto.intervalCount !== undefined ||
-        updateSubscriptionPlanDto.currency !== undefined
-      ) {
-        const stripePrice = await this.stripeService.createPrice(
-          subscriptionPlan.stripeProductId,
-          updateSubscriptionPlanDto.price || subscriptionPlan.price,
-          updateSubscriptionPlanDto.currency || subscriptionPlan.currency,
-          updateSubscriptionPlanDto.interval || subscriptionPlan.interval,
-          updateSubscriptionPlanDto.intervalCount || subscriptionPlan.intervalCount,
-        );
-        
-        // Update the subscription plan with the new price ID
+      // Check if this is a free plan or if skipStripe is true
+      const isFreePlan = updateSubscriptionPlanDto.price === 0 || updateSubscriptionPlanDto.skipStripe === true;
+      const wasFreePlan = subscriptionPlan.price === 0 || subscriptionPlan.skipStripe === true;
+
+      if (isFreePlan || wasFreePlan) {
+        // For free plans or plans with skipStripe, don't interact with Stripe
         await subscriptionPlan.update({
           ...updateSubscriptionPlanDto,
-          stripePriceId: stripePrice.id
+          stripeProductId: null,
+          stripePriceId: null
         }, { transaction });
       } else {
-        // Update subscription plan in database without changing the price ID
-        await subscriptionPlan.update(updateSubscriptionPlanDto, { transaction });
+        // Update product in Stripe if name or description changed
+        if (updateSubscriptionPlanDto.name || updateSubscriptionPlanDto.description) {
+          await this.stripeService.updateProduct(
+            subscriptionPlan.stripeProductId,
+            updateSubscriptionPlanDto.name || subscriptionPlan.name,
+            updateSubscriptionPlanDto.description || subscriptionPlan.description,
+          );
+        }
+        
+        // If price or interval changed, create a new price in Stripe
+        if (
+          updateSubscriptionPlanDto.price !== undefined ||
+          updateSubscriptionPlanDto.interval !== undefined ||
+          updateSubscriptionPlanDto.intervalCount !== undefined ||
+          updateSubscriptionPlanDto.currency !== undefined
+        ) {
+          const stripePrice = await this.stripeService.createPrice(
+            subscriptionPlan.stripeProductId,
+            updateSubscriptionPlanDto.price || subscriptionPlan.price,
+            updateSubscriptionPlanDto.currency || subscriptionPlan.currency,
+            updateSubscriptionPlanDto.interval || subscriptionPlan.interval,
+            updateSubscriptionPlanDto.intervalCount || subscriptionPlan.intervalCount,
+          );
+          
+          // Update the subscription plan with the new price ID
+          await subscriptionPlan.update({
+            ...updateSubscriptionPlanDto,
+            stripePriceId: stripePrice.id
+          }, { transaction });
+        } else {
+          // Update subscription plan in database without changing the price ID
+          await subscriptionPlan.update(updateSubscriptionPlanDto, { transaction });
+        }
       }
       
       await transaction.commit();
