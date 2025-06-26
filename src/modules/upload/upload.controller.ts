@@ -1,11 +1,11 @@
-import { Controller, Post, UseInterceptors, UploadedFile, Body, BadRequestException, ParseFilePipe, MaxFileSizeValidator } from '@nestjs/common';
+import { Controller, Post, UseInterceptors, UploadedFile, Body, BadRequestException, ParseFilePipe, MaxFileSizeValidator, PayloadTooLargeException } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { ApiTags, ApiConsumes, ApiBody } from '@nestjs/swagger';
 import { UploadService } from './upload.service';
 import { successResponse } from '../../common/helpers/response.helper';
 import { Public } from '../auth/decorators/public.decorator';
 
-const MAX_FILE_SIZE = 10 * 1024 * 1024; // 100mb in bytes
+const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB in bytes
 
 @ApiTags('Upload')
 @Controller('upload')
@@ -16,12 +16,12 @@ export class UploadController {
   @Post('file')
   @UseInterceptors(FileInterceptor('file', {
     limits: {
-      fileSize: MAX_FILE_SIZE, // 100mb
+      fileSize: MAX_FILE_SIZE, // 10MB
       files: 1
     },
     fileFilter: (req, file, cb) => {
-      if (file.size && file.size > MAX_FILE_SIZE) {
-        cb(new BadRequestException(`File size too large. Maximum size is ${MAX_FILE_SIZE / (1024 * 1024)}MB`), false);
+      if (file.size > MAX_FILE_SIZE) {
+        cb(new PayloadTooLargeException('File size exceeds the 10MB limit. Please upload a smaller file.'), false);
       }
       cb(null, true);
     }
@@ -34,7 +34,7 @@ export class UploadController {
         file: {
           type: 'string',
           format: 'binary',
-          description: 'File to upload (max 100mb)'
+          description: 'File to upload (max 10MB)'
         },
         folder: {
           type: 'string',
@@ -48,7 +48,10 @@ export class UploadController {
     @UploadedFile(
       new ParseFilePipe({
         validators: [
-          new MaxFileSizeValidator({ maxSize: MAX_FILE_SIZE })
+          new MaxFileSizeValidator({ 
+            maxSize: MAX_FILE_SIZE,
+            message: 'File size exceeds the 10MB limit. Please upload a smaller file.'
+          })
         ]
       })
     ) file: any,
@@ -72,6 +75,9 @@ export class UploadController {
         mimetype: file.mimetype
       }, 'File uploaded successfully');
     } catch (error) {
+      if (error instanceof PayloadTooLargeException) {
+        throw new PayloadTooLargeException('File size exceeds the 10MB limit. Please upload a smaller file.');
+      }
       throw new BadRequestException(`File upload failed: ${error.message}`);
     }
   }
