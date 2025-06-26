@@ -161,43 +161,35 @@ export class CreateCompanyDto {
 
   // Social Media Links (Any one social media link is sufficient for business verification)
   @ApiProperty({ 
-    description: 'Facebook page URL (Any one social media link is sufficient for business verification)', 
-    example: 'https://facebook.com/company'
+    description: 'Facebook page URL', 
+    example: 'https://facebook.com/company',
+    required: false
   })
   @IsOptional()
-  @IsUrl({
-    protocols: ['http', 'https'],
-  })
   facebookUrl?: string;
 
   @ApiProperty({ 
-    description: 'LinkedIn company page URL (Any one social media link is sufficient for business verification)', 
-    example: 'https://linkedin.com/company/example'
+    description: 'LinkedIn company page URL', 
+    example: 'https://linkedin.com/company/example',
+    required: false
   })
   @IsOptional()
-  @IsUrl({
-    protocols: ['http', 'https'],
-  })
   linkedinUrl?: string;
 
   @ApiProperty({ 
-    description: 'Twitter profile URL (Any one social media link is sufficient for business verification)', 
-    example: 'https://twitter.com/company'
+    description: 'Twitter profile URL', 
+    example: 'https://twitter.com/company',
+    required: false
   })
   @IsOptional()
-  @IsUrl({
-    protocols: ['http', 'https'],
-  })
   twitterUrl?: string;
 
   @ApiProperty({ 
-    description: 'Instagram profile URL (Any one social media link is sufficient for business verification)', 
-    example: 'https://instagram.com/company'
+    description: 'Instagram profile URL', 
+    example: 'https://instagram.com/company',
+    required: false
   })
   @IsOptional()
-  @IsUrl({
-    protocols: ['http', 'https'],
-  })
   instagramUrl?: string;
 
   // Media & Branding
