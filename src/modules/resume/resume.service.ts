@@ -667,14 +667,15 @@ export class ResumeService {
     const transaction = await this.sequelize.transaction();
     
     try {
-      // Find the resume
-      const resume = await this.resumeModel.findOne({
+      // First try to find or create a default resume
+      let resume = await this.resumeModel.findOne({
         where: { userId },
         transaction,
       });
 
+      // If resume doesn't exist, create a default one
       if (!resume) {
-        throw new NotFoundException('Resume not found');
+        resume = await this.createDefaultResumeIfNotExists(userId.toString());
       }
 
       // Update the resume to remove the CV URL

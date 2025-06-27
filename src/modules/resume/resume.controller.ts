@@ -195,51 +195,10 @@ export class ResumeController {
   @Patch('cv/student/upload/replace')
   @ApiOperation({ summary: 'Upload or update resume CV document' })
   @ApiResponse({ status: 200, description: 'CV updated successfully' })
-  @ApiResponse({ status: 404, description: 'Resume not found' })
   @ApiBearerAuth()
   async uploadCv(@Request() req, @Body() uploadCvDto: UploadCvDto) {
-    try {
-      const userId = req.user?.sub;
-      
-      if (!userId) {
-        throw new UnauthorizedException('User not authenticated');
-      }
-      
-      // First, check if the user has a resume
-      let resume = await this.resumeService.findByUserId(userId);
-      
-      // If no resume exists, create a basic one
-      if (!resume) {
-        console.log(`No resume found for user ${userId}, creating a new one`);
-        
-        // Create a basic resume DTO with required fields
-        const createResumeDto: CreateResumeDto = {
-          firstName: '',
-          lastName: '',
-          email: '',
-          // Add any other required fields with default values
-        };
-        
-        resume = await this.resumeService.create(userId, createResumeDto);
-        
-        if (!resume) {
-          throw new InternalServerErrorException('Failed to create resume');
-        }
-      }
-      
-      // Now update the CV URL
-      const updatedResume = await this.resumeService.updateCv(userId, uploadCvDto.cvUrl);
-      
-      return successResponse(updatedResume, 'Resume CV updated successfully');
-    } catch (error) {
-      console.error('Error updating resume CV:', error.message);
-      
-      if (error instanceof NotFoundException) {
-        throw error;
-      }
-      
-      throw new BadRequestException(`Failed to update CV: ${error.message}`);
-    }
+    const resume = await this.resumeService.updateCv(req.user.sub, uploadCvDto.cvUrl);
+    return successResponse(resume, 'Resume CV updated successfully');
   }
 
   @Delete('video')
