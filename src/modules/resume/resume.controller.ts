@@ -192,7 +192,7 @@ export class ResumeController {
     }
   }
 
-  @Patch('cv')
+  @Patch('cv/student/upload/replace')
   @ApiOperation({ summary: 'Upload or update resume CV document' })
   @ApiResponse({ status: 200, description: 'CV updated successfully' })
   @ApiBearerAuth()
@@ -210,7 +210,7 @@ export class ResumeController {
     return successResponse(resume, 'Resume video deleted successfully');
   }
 
-  @Delete('cv')
+  @Delete('cv/student/delete')
   @ApiOperation({ summary: 'Delete resume CV document' })
   @ApiResponse({ status: 200, description: 'CV deleted successfully' })
   @ApiBearerAuth()
