@@ -136,38 +136,45 @@ export class ResumeService {
    * This method handles both finding by ID and finding by userId
    */
   async findOne(idOrUserId: string, isUserId = false): Promise<Resume> {
-    console.log(`ResumeService.findOne called with ${isUserId ? 'userId' : 'id'}: ${idOrUserId}`);
+    console.log(`[ResumeService] findOne called with ${isUserId ? 'userId' : 'id'}: ${idOrUserId}`);
     
     let resume: Resume;
     
-    if (isUserId) {
-      // Find by userId
-      resume = await this.resumeModel.findOne({
-        where: { userId: idOrUserId },
-        include: [
-          { model: Education },
-          { model: Experience },
-          { model: Attachment },
-        ],
-      });
-    } else {
-      // Find by primary key (id)
-      resume = await this.resumeModel.findByPk(idOrUserId, {
-        include: [
-          { model: Education },
-          { model: Experience },
-          { model: Attachment },
-        ],
-      });
+    try {
+      if (isUserId) {
+        // Find by userId
+        console.log(`[ResumeService] Searching for resume by userId: ${idOrUserId}`);
+        resume = await this.resumeModel.findOne({
+          where: { userId: idOrUserId },
+          include: [
+            { model: Education },
+            { model: Experience },
+            { model: Attachment },
+          ],
+        });
+      } else {
+        // Find by primary key (id)
+        console.log(`[ResumeService] Searching for resume by id: ${idOrUserId}`);
+        resume = await this.resumeModel.findByPk(idOrUserId, {
+          include: [
+            { model: Education },
+            { model: Experience },
+            { model: Attachment },
+          ],
+        });
+      }
+      
+      if (!resume) {
+        console.log(`[ResumeService] Resume not found with ${isUserId ? 'userId' : 'id'}: ${idOrUserId}`);
+        throw new NotFoundException(`Resume not found`);
+      }
+      
+      console.log(`[ResumeService] Resume found with id: ${resume.id}`);
+      return resume;
+    } catch (error) {
+      console.error(`[ResumeService] Error in findOne:`, error);
+      throw error;
     }
-    
-    if (!resume) {
-      console.log(`Resume not found with ${isUserId ? 'userId' : 'id'}: ${idOrUserId}`);
-      throw new NotFoundException(`Resume not found`);
-    }
-    
-    console.log('Resume found:', resume.id);
-    return resume;
   }
 
   /**
@@ -599,10 +606,12 @@ export class ResumeService {
    * Update a user's resume CV document
    */
   async updateCv(userId: string, cvUrl: string): Promise<Resume> {
+    console.log(`[ResumeService] Attempting to update CV for user: ${userId}`);
     const transaction = await this.sequelize.transaction();
     
     try {
       // Find the resume
+      console.log(`[ResumeService] Looking for existing resume for user: ${userId}`);
       let resume = await this.resumeModel.findOne({
         where: { userId },
         transaction,
@@ -610,21 +619,29 @@ export class ResumeService {
 
       // If resume doesn't exist, create a new one
       if (!resume) {
+        console.log(`[ResumeService] No resume found, creating new resume for user: ${userId}`);
         resume = await this.resumeModel.create(
           {
             cvUrl,
             userId,
-          } as any,  // Type assertion to bypass type checking
+          } as any,
           { transaction }
         );
+        console.log(`[ResumeService] Created new resume with ID: ${resume.id}`);
       } else {
         // Update existing resume
+        console.log(`[ResumeService] Found existing resume ${resume.id}, updating CV URL`);
         await resume.update({ cvUrl }, { transaction });
       }
 
       await transaction.commit();
-      return this.findOne(userId);
+      console.log(`[ResumeService] Successfully committed CV update transaction`);
+      
+      const updatedResume = await this.findOne(userId, true);
+      console.log(`[ResumeService] Retrieved updated resume: ${updatedResume.id}`);
+      return updatedResume;
     } catch (error) {
+      console.error(`[ResumeService] Error in updateCv:`, error);
       await transaction.rollback();
       throw error;
     }
@@ -664,10 +681,12 @@ export class ResumeService {
    * Delete a user's resume CV document
    */
   async deleteCv(userId: number): Promise<Resume> {
+    console.log(`[ResumeService] Attempting to delete CV for user: ${userId}`);
     const transaction = await this.sequelize.transaction();
     
     try {
       // First try to find or create a default resume
+      console.log(`[ResumeService] Looking for existing resume for user: ${userId}`);
       let resume = await this.resumeModel.findOne({
         where: { userId },
         transaction,
@@ -675,17 +694,24 @@ export class ResumeService {
 
       // If resume doesn't exist, create a default one
       if (!resume) {
+        console.log(`[ResumeService] No resume found, creating default resume for user: ${userId}`);
         resume = await this.createDefaultResumeIfNotExists(userId.toString());
+        console.log(`[ResumeService] Created default resume with ID: ${resume?.id || 'unknown'}`);
       }
 
+      console.log(`[ResumeService] Updating resume ${resume.id} to remove CV URL`);
       // Update the resume to remove the CV URL
       await resume.update({ cvUrl: null }, { transaction });
 
       await transaction.commit();
+      console.log(`[ResumeService] Successfully committed CV deletion transaction`);
 
       // Return the updated resume
-      return this.findOne(userId.toString());
+      const updatedResume = await this.findOne(userId.toString(), true);
+      console.log(`[ResumeService] Retrieved updated resume: ${updatedResume.id}`);
+      return updatedResume;
     } catch (error) {
+      console.error(`[ResumeService] Error in deleteCv:`, error);
       await transaction.rollback();
       throw error;
     }
@@ -1143,32 +1169,41 @@ export class ResumeService {
    * Create a default resume for a user if one doesn't exist
    */
   async createDefaultResumeIfNotExists(userId: string): Promise<Resume> {
-    // First check if a resume already exists
-    let resume = await this.findByUserId(userId);
+    console.log(`[ResumeService] Attempting to create default resume for user: ${userId}`);
     
-    if (resume) {
+    try {
+      // First check if a resume already exists
+      let resume = await this.findByUserId(userId);
+      
+      if (resume) {
+        console.log(`[ResumeService] Existing resume found with ID: ${resume.id}`);
+        return resume;
+      }
+      
+      // Get user data to populate the resume
+      console.log(`[ResumeService] No existing resume found, fetching user data`);
+      const user = await this.userModel.findByPk(userId);
+      
+      if (!user) {
+        console.error(`[ResumeService] User not found with ID: ${userId}`);
+        throw new NotFoundException('User not found');
+      }
+      
+      // Create a basic resume with user information
+      console.log(`[ResumeService] Creating default resume for user: ${user.email}`);
+      resume = await this.resumeModel.create({
+        userId: user.id,
+        firstName: user.firstName,
+        lastName: user.lastName,
+        email: user.email,
+      });
+      
+      console.log(`[ResumeService] Created default resume with ID: ${resume.id}`);
       return resume;
+    } catch (error) {
+      console.error(`[ResumeService] Error in createDefaultResumeIfNotExists:`, error);
+      throw error;
     }
-    
-    // Get user data to populate the resume
-    const user = await this.userModel.findByPk(userId);
-    
-    if (!user) {
-      throw new NotFoundException('User not found');
-    }
-    
-    // Create a basic resume with user information
-    resume = await this.resumeModel.create({
-      userId: user.id,
-      firstName: user.firstName,
-      lastName: user.lastName,
-      email: user.email,
-      // Add other default fields as needed
-    });
-    
-    console.log(`Created default resume with ID: ${resume.id} for user: ${userId}`);
-    
-    return resume;
   }
 
   /**
