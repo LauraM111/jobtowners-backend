@@ -21,7 +21,7 @@ export enum PlanStatus {
 export class SubscriptionPlan extends Model {
   @Column({
     type: DataType.UUID,
-    primaryKey: true,
+    primaryKey: true, 
     defaultValue: DataType.UUIDV4
   })
   id: string;
