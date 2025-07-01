@@ -185,6 +185,8 @@ export class CandidatePaymentController {
   @HttpCode(200)
   @ApiOperation({ summary: 'Handle Stripe webhook events' })
   async handleWebhook(@Req() req: RawBodyRequest<Request>) {
+    console.log('Received candidate payment webhook request');
+    
     const signature = req.headers['stripe-signature'];
     let event: Stripe.Event;
 
@@ -193,16 +195,25 @@ export class CandidatePaymentController {
       const rawBody = req.rawBody;
       
       if (!rawBody || !signature) {
-        throw new BadRequestException('Missing raw body or signature');
+        console.warn('Missing raw body or signature in candidate payment webhook');
+        return { error: 'Missing raw body or signature', received: false };
       }
 
       // Verify the webhook signature
       const endpointSecret = this.configService.get<string>('STRIPE_WEBHOOK_SECRET');
+      
+      if (!endpointSecret) {
+        console.error('STRIPE_WEBHOOK_SECRET not configured for candidate payments');
+        return { error: 'Webhook secret not configured', received: false };
+      }
+      
       event = this.stripe.webhooks.constructEvent(
         rawBody.toString(),
         signature,
         endpointSecret
       );
+
+      console.log(`Processing candidate payment webhook event: ${event.type}`);
 
       // Handle the event
       switch (event.type) {
@@ -219,13 +230,17 @@ export class CandidatePaymentController {
           break;
         
         default:
-          console.log(`Unhandled event type ${event.type}`);
+          console.log(`Unhandled candidate payment event type: ${event.type}`);
+          break;
       }
 
-      return { received: true };
+      console.log(`Successfully processed candidate payment webhook event: ${event.type}`);
+      return { received: true, eventType: event.type };
     } catch (error) {
-      console.error(`Webhook error: ${error.message}`);
-      throw new BadRequestException(`Webhook error: ${error.message}`);
+      console.error(`Candidate payment webhook error: ${error.message}`, error.stack);
+      // Return success even if there's an error to prevent Stripe from retrying
+      // Log the error for debugging but don't throw an exception
+      return { received: true, error: error.message };
     }
   }
 

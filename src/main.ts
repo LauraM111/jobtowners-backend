@@ -41,12 +41,19 @@ async function bootstrap() {
       bodyParser: false, // Disable the built-in body parser
     });
   
-    // Use raw body parser for webhook routes
+    // Configure body parsers for different routes
+    // Use raw body parser for ALL webhook routes BEFORE any other body parsers
     app.use('/api/v1/webhooks/stripe', bodyParser.raw({ type: 'application/json' }));
+    app.use('/api/v1/candidate-payments/webhook', bodyParser.raw({ type: 'application/json' }));
   
     // Use JSON body parser for all other routes with increased limits
-    // Configure global request size limit
-    app.use(bodyParser.json({ limit: '10mb' }));
+    app.use(bodyParser.json({ 
+      limit: '10mb',
+      verify: (req: any, res, buf) => {
+        // Store raw body for webhook verification
+        req.rawBody = buf;
+      }
+    }));
     app.use(bodyParser.urlencoded({ limit: '10mb', extended: true }));
     app.use(bodyParser.raw({ limit: '10mb' }));
   

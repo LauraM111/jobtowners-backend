@@ -37,13 +37,33 @@ export class HttpExceptionFilter implements ExceptionFilter {
       errorDetails = exception.stack;
     }
 
-    // Log the error
+    // Special handling for webhook routes
+    const isWebhookRoute = request.url.includes('/webhooks/') || request.url.includes('/webhook');
+    
+    if (isWebhookRoute) {
+      // For webhook routes, always return 200 to prevent retries
+      this.logger.error(
+        `WEBHOOK ERROR: ${request.method} ${request.url} - Original Status: ${status} - ${message}`,
+        errorDetails,
+      );
+      
+      response
+        .status(HttpStatus.OK)
+        .json({ 
+          received: true, 
+          error: message,
+          originalStatus: status 
+        });
+      return;
+    }
+
+    // Log the error for non-webhook routes
     this.logger.error(
       `${request.method} ${request.url} - ${status} - ${message}`,
       errorDetails,
     );
 
-    // Send the error response
+    // Send the error response for non-webhook routes
     response
       .status(status)
       .json(errorResponse(message, errorDetails));
