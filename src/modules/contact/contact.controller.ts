@@ -22,6 +22,29 @@ export class ContactController {
     return this.contactService.processContactForm(contactFormDto);
   }
 
+  @Public()
+  @Post('test-reply-to')
+  @ApiOperation({ summary: 'Test contact form with Reply-To (for testing purposes)' })
+  @ApiResponse({ status: 201, description: 'Test contact form sent with Reply-To header' })
+  async testContactFormReplyTo(@Body() contactFormDto: ContactFormDto) {
+    // This is a test endpoint to verify Reply-To functionality
+    // It does the same as the regular contact form but logs the email details
+    console.log('Testing contact form with Reply-To functionality');
+    console.log('User email (will be set as Reply-To):', contactFormDto.email);
+    console.log('User name:', contactFormDto.name);
+    
+    const result = await this.contactService.processContactForm(contactFormDto);
+    
+    return {
+      ...result,
+      replyToTest: {
+        userEmail: contactFormDto.email,
+        userName: contactFormDto.name,
+        note: 'Reply-To header should be set to the user email above'
+      }
+    };
+  }
+
   @Get()
   @Roles('admin')
   @UseGuards(RolesGuard)
