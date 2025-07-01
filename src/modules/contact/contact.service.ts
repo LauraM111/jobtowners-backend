@@ -21,12 +21,13 @@ export class ContactService {
     const subject = `Contact Form: ${contactFormDto.subject}`;
     const html = this.createEmailTemplate(contactFormDto);
     
-    // Send email to admin
+    // Send email to admin with user's email as Reply-To
     await this.mailgunService.sendEmail({
       to: adminEmail,
       subject,
       html,
       from: `${this.configService.get('MAIL_FROM_NAME')} <${this.configService.get('MAIL_FROM_ADDRESS')}>`,
+      replyTo: `${contactFormDto.name} <${contactFormDto.email}>`, // Set Reply-To to user's email
     });
     
     // Store the submission in the database
@@ -140,6 +141,7 @@ export class ContactService {
       subject: `Re: ${submission.subject}`,
       html: this.createResponseTemplate(submission, message),
       from: `${this.configService.get('MAIL_FROM_NAME')} <${this.configService.get('MAIL_FROM_ADDRESS')}>`,
+      // No need to set replyTo here since the admin wants replies to come back to the business email
     });
     
     // Update submission status

@@ -9,6 +9,7 @@ interface EmailOptions {
   subject: string;
   html: string;
   from: string;
+  replyTo?: string;
 }
 
 @Injectable()
@@ -29,12 +30,18 @@ export class MailgunService {
 
   async sendEmail(options: EmailOptions): Promise<any> {
     try {
-      const result = await this.transporter.sendMail({
+      const mailOptions: any = {
         from: options.from,
         to: options.to,
         subject: options.subject,
         html: options.html,
-      });
+      };
+
+      if (options.replyTo) {
+        mailOptions.replyTo = options.replyTo;
+      }
+
+      const result = await this.transporter.sendMail(mailOptions);
       
       return result;
     } catch (error) {
