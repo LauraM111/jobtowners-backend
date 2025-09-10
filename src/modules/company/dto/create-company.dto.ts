@@ -37,6 +37,7 @@ export class CreateCompanyDto {
     description: 'Company website URL (Required for business verification if no other verification methods provided)', 
     example: 'https://www.acmecorp.com'
   })
+  @ValidateIf(o => o.website && o.website.trim() !== '')
   @IsUrl()
   @IsOptional()
   website?: string;
@@ -165,6 +166,8 @@ export class CreateCompanyDto {
     example: 'https://facebook.com/company',
     required: false
   })
+  @ValidateIf(o => o.facebookUrl && o.facebookUrl.trim() !== '')
+  @IsUrl()
   @IsOptional()
   facebookUrl?: string;
 
@@ -173,6 +176,8 @@ export class CreateCompanyDto {
     example: 'https://linkedin.com/company/example',
     required: false
   })
+  @ValidateIf(o => o.linkedinUrl && o.linkedinUrl.trim() !== '')
+  @IsUrl()
   @IsOptional()
   linkedinUrl?: string;
 
@@ -181,6 +186,8 @@ export class CreateCompanyDto {
     example: 'https://twitter.com/company',
     required: false
   })
+  @ValidateIf(o => o.twitterUrl && o.twitterUrl.trim() !== '')
+  @IsUrl()
   @IsOptional()
   twitterUrl?: string;
 
@@ -189,16 +196,20 @@ export class CreateCompanyDto {
     example: 'https://instagram.com/company',
     required: false
   })
+  @ValidateIf(o => o.instagramUrl && o.instagramUrl.trim() !== '')
+  @IsUrl()
   @IsOptional()
   instagramUrl?: string;
 
   // Media & Branding
   @ApiProperty({ description: 'Logo image URL', example: 'https://www.acmecorp.com/logo.png', required: false })
+  @ValidateIf(o => o.logoUrl && o.logoUrl.trim() !== '')
   @IsUrl()
   @IsOptional()
   logoUrl?: string;
 
   @ApiProperty({ description: 'Banner or cover photo URL', example: 'https://www.acmecorp.com/cover.jpg', required: false })
+  @ValidateIf(o => o.coverImageUrl && o.coverImageUrl.trim() !== '')
   @IsUrl()
   @IsOptional()
   coverImageUrl?: string;
