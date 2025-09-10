@@ -1,7 +1,7 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { 
   IsString, IsEmail, IsOptional, IsArray, IsEnum, 
-  IsDateString, IsNotEmpty, IsUUID 
+  IsDateString, IsNotEmpty, IsUUID, ValidateIf
 } from 'class-validator';
 import { JobType, Gender, JobStatus, VerificationStatus } from '../entities/job.entity';
 
@@ -21,10 +21,11 @@ export class CreateJobDto {
   @IsNotEmpty()
   jobDescription: string;
 
-  @ApiProperty({ description: 'Email address for applications', example: 'jobs@company.com' })
+  @ApiPropertyOptional({ description: 'Email address for applications', example: 'jobs@company.com' })
+  @ValidateIf(o => o.emailAddress && o.emailAddress.trim() !== '')
   @IsEmail()
-  @IsNotEmpty()
-  emailAddress: string;
+  @IsOptional()
+  emailAddress?: string;
 
   @ApiPropertyOptional({ description: 'Job specialisms', example: ['JavaScript', 'React', 'Node.js'] })
   @IsArray()
