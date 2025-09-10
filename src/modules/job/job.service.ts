@@ -939,6 +939,32 @@ export class JobService {
     // Get current active jobs count
     const activeJobs = userJobs.length;
     
+    // Get actual application counts from JobApplication table for each job
+    const jobIds = userJobs.map(job => job.id);
+    const actualApplicationCounts: Record<string, number> = {};
+    
+    if (jobIds.length > 0) {
+      // Get actual application counts by job ID
+      const applicationCountsQuery = await this.sequelize.models.JobApplication.findAll({
+        where: {
+          jobId: {
+            [Op.in]: jobIds
+          }
+        },
+        attributes: [
+          'jobId',
+          [Sequelize.fn('COUNT', Sequelize.col('id')), 'count']
+        ],
+        group: ['jobId'],
+        raw: true
+      });
+      
+      // Convert to object for easy lookup
+      applicationCountsQuery.forEach((result: any) => {
+        actualApplicationCounts[result.jobId] = parseInt(result.count) || 0;
+      });
+    }
+    
     // Get today's job posting count
     const today = new Date();
     today.setHours(0, 0, 0, 0);
@@ -952,21 +978,27 @@ export class JobService {
       }
     });
     
-    // Calculate total application limits and usage
+    // Calculate total application limits and usage using actual counts
     const totalMaxApplications = activeJobs * applicantsPerJob;
-    const totalCurrentApplications = userJobs.reduce((sum, job) => sum + (job.applications || 0), 0);
+    const totalCurrentApplications = Object.values(actualApplicationCounts).reduce((sum: number, count: number) => sum + count, 0);
     const remainingApplicationSlots = Math.max(0, totalMaxApplications - totalCurrentApplications);
     
-    // Create job breakdown showing limits per job
-    const jobBreakdown = userJobs.map(job => ({
-      jobId: job.id,
-      jobTitle: job.jobTitle,
-      currentApplications: job.applications || 0,
-      maxApplicationsPerJob: applicantsPerJob,
-      remainingSlots: Math.max(0, applicantsPerJob - (job.applications || 0)),
-      status: job.status,
-      createdAt: job.createdAt
-    }));
+    // Create job breakdown showing limits per job with actual application counts
+    const jobBreakdown = userJobs.map(job => {
+      const actualApplications = actualApplicationCounts[job.id] || 0;
+      return {
+        jobId: job.id,
+        jobTitle: job.jobTitle,
+        currentApplications: actualApplications,
+        maxApplicationsPerJob: applicantsPerJob,
+        remainingSlots: Math.max(0, applicantsPerJob - actualApplications),
+        status: job.status,
+        createdAt: job.createdAt,
+        // For debugging - show both counter and actual count
+        counterFieldValue: job.applications || 0,
+        actualCountFromApplications: actualApplications
+      };
+    });
     
     // Get applications received in the last 24 hours
     const last24Hours = new Date();
