@@ -922,6 +922,10 @@ export class JobService {
     const maxApplications = subscriptions && subscriptions.length > 0 
       ? Math.max(...subscriptions.map(sub => sub.plan.resumeViewsCount))
       : 0;
+      
+    const maxApplicantsPerJob = subscriptions && subscriptions.length > 0 
+      ? Math.max(...subscriptions.map(sub => sub.plan.maxApplicantsPerJob || 10))
+      : 10;
     // Get current active jobs count
     const activeJobs = await this.jobModel.count({
       where: {
@@ -986,7 +990,8 @@ export class JobService {
       applicationStats: {
         totalApplications: totalApplications || 0,
         applicationsToday: applicationsLast24Hours || 0,
-        maxApplications: maxApplications || 0
+        maxApplications: maxApplications || 0,
+        maxApplicantsPerJob: maxApplicantsPerJob
       },
       subscriptions: subscriptionDetails,
       hasActiveSubscription: subscriptions && subscriptions.length > 0

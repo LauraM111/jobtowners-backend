@@ -54,6 +54,12 @@ export class CreateSubscriptionPlanDto {
   @IsOptional()
   resumeViewsCount?: number;
 
+  @ApiPropertyOptional({ description: 'Maximum number of applicants allowed per job post', example: 10 })
+  @IsNumber()
+  @Min(1)
+  @IsOptional()
+  maxApplicantsPerJob?: number;
+
   @ApiPropertyOptional({ 
     description: 'Skip Stripe integration for zero-price plans. If true and price is 0, no Stripe product/price will be created.',
     example: false
