@@ -79,14 +79,21 @@ export class JobService {
         }
       }
       
-      // Create the job
-      const job = await this.jobModel.create({
+      // Prepare job data, handling empty email addresses
+      const jobData = {
         ...createJobDto,
         userId,
         applicationDeadlineDate: createJobDto.applicationDeadlineDate ? new Date(createJobDto.applicationDeadlineDate) : null,
         attachmentUrl: attachmentUrl || null,
-        verificationStatus: VerificationStatus.PENDING
-      }, { transaction });
+        verificationStatus: VerificationStatus.PENDING,
+        // Convert empty email string to null
+        emailAddress: createJobDto.emailAddress && createJobDto.emailAddress.trim() !== '' 
+          ? createJobDto.emailAddress 
+          : null
+      };
+
+      // Create the job
+      const job = await this.jobModel.create(jobData, { transaction });
       
       await transaction.commit();
       return job;
