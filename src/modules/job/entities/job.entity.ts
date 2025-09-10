@@ -74,9 +74,17 @@ export class Job extends Model {
 
   @Column({
     type: DataType.STRING,
-    allowNull: false,
+    allowNull: true,
     validate: {
-      isEmail: true
+      isEmailOrEmpty(value: string) {
+        if (value && value.trim() !== '') {
+          // Only validate email format if value is provided and not empty
+          const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+          if (!emailRegex.test(value)) {
+            throw new Error('Invalid email format');
+          }
+        }
+      }
     }
   })
   emailAddress: string;
