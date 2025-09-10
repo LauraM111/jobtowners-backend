@@ -74,31 +74,6 @@ export class JobApplicationService {
       throw new BadRequestException('You have already applied for this job');
     }
 
-    // Check per-job applicant limit based on employer's subscription plan
-    const employerSubscriptions = await this.subscriptionService.getUserSubscriptions(job.userId);
-    
-    if (employerSubscriptions && employerSubscriptions.length > 0) {
-      // Get the maximum applicants allowed per job from all active subscriptions
-      const maxApplicantsPerJob = Math.max(
-        ...employerSubscriptions.map(sub => sub.plan.maxApplicantsPerJob || 10)
-      );
-
-      // Count current applications for this specific job
-      const currentApplicationsCount = await this.jobApplicationModel.count({
-        where: {
-          jobId: createJobApplicationDto.jobId,
-        },
-      });
-
-      console.log(`Job ${createJobApplicationDto.jobId}: ${currentApplicationsCount}/${maxApplicantsPerJob} applicants`);
-
-      if (currentApplicationsCount >= maxApplicantsPerJob) {
-        throw new BadRequestException(
-          `This job has reached its maximum limit of ${maxApplicantsPerJob} applicants. No more applications can be accepted.`
-        );
-      }
-    }
-
     return this.jobApplicationModel.create({
       applicantId: userId,
       jobId: createJobApplicationDto.jobId,

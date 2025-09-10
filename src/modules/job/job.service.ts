@@ -919,22 +919,25 @@ export class JobService {
       ? Math.max(...subscriptions.map(sub => sub.plan.numberOfJobs))
       : 0;
    
-    const maxApplications = subscriptions && subscriptions.length > 0 
+    // Get applicants per job limit from subscription plan
+    const applicantsPerJob = subscriptions && subscriptions.length > 0 
       ? Math.max(...subscriptions.map(sub => sub.plan.resumeViewsCount))
       : 0;
-      
-    const maxApplicantsPerJob = subscriptions && subscriptions.length > 0 
-      ? Math.max(...subscriptions.map(sub => sub.plan.maxApplicantsPerJob || 10))
-      : 10;
-    // Get current active jobs count
-    const activeJobs = await this.jobModel.count({
+
+    // Get all user's jobs with their application counts
+    const userJobs = await this.jobModel.findAll({
       where: {
         userId,
         status: {
           [Op.ne]: JobStatus.EXPIRED
         }
-      }
+      },
+      attributes: ['id', 'jobTitle', 'applications', 'status', 'createdAt'],
+      order: [['createdAt', 'DESC']]
     });
+    
+    // Get current active jobs count
+    const activeJobs = userJobs.length;
     
     // Get today's job posting count
     const today = new Date();
@@ -949,10 +952,21 @@ export class JobService {
       }
     });
     
-    // Get application statistics
-    const totalApplications = await this.jobModel.sum('applications', {
-      where: { userId }
-    });
+    // Calculate total application limits and usage
+    const totalMaxApplications = activeJobs * applicantsPerJob;
+    const totalCurrentApplications = userJobs.reduce((sum, job) => sum + (job.applications || 0), 0);
+    const remainingApplicationSlots = Math.max(0, totalMaxApplications - totalCurrentApplications);
+    
+    // Create job breakdown showing limits per job
+    const jobBreakdown = userJobs.map(job => ({
+      jobId: job.id,
+      jobTitle: job.jobTitle,
+      currentApplications: job.applications || 0,
+      maxApplicationsPerJob: applicantsPerJob,
+      remainingSlots: Math.max(0, applicantsPerJob - (job.applications || 0)),
+      status: job.status,
+      createdAt: job.createdAt
+    }));
     
     // Get applications received in the last 24 hours
     const last24Hours = new Date();
@@ -969,14 +983,13 @@ export class JobService {
       }
     });
     
-   
-    
-    // Get subscription details - removed expiryDate
+    // Get subscription details
     const subscriptionDetails = subscriptions && subscriptions.length > 0
       ? subscriptions.map(sub => ({
           id: sub.id,
           planName: sub.plan.name,
-          jobsAllowed: sub.plan.numberOfJobs
+          jobsAllowed: sub.plan.numberOfJobs,
+          applicantsPerJob: sub.plan.resumeViewsCount
         }))
       : [];
     
@@ -988,13 +1001,22 @@ export class JobService {
         jobsPostedToday: jobsPostedToday
       },
       applicationStats: {
-        totalApplications: totalApplications || 0,
+        applicantsPerJob: applicantsPerJob,
+        totalMaxApplications: totalMaxApplications,
+        totalCurrentApplications: totalCurrentApplications,
+        remainingApplicationSlots: remainingApplicationSlots,
         applicationsToday: applicationsLast24Hours || 0,
-        maxApplications: maxApplications || 0,
-        maxApplicantsPerJob: maxApplicantsPerJob
+        // Legacy field for backward compatibility
+        maxApplications: totalMaxApplications,
+        totalApplications: totalCurrentApplications
       },
+      jobBreakdown: jobBreakdown,
       subscriptions: subscriptionDetails,
-      hasActiveSubscription: subscriptions && subscriptions.length > 0
+      hasActiveSubscription: subscriptions && subscriptions.length > 0,
+      calculationExplanation: {
+        formula: "Total Application Limit = Number of Active Jobs × Applicants Per Job",
+        example: `${activeJobs} jobs × ${applicantsPerJob} applicants per job = ${totalMaxApplications} total applicants allowed`
+      }
     };
   }
 }

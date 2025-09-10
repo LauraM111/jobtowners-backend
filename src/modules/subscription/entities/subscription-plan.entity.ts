@@ -119,14 +119,6 @@ export class SubscriptionPlan extends Model {
   resumeViewsCount: number;
 
   @Column({
-    type: DataType.INTEGER,
-    allowNull: false,
-    defaultValue: 10,
-    comment: 'Maximum number of applicants allowed per job post'
-  })
-  maxApplicantsPerJob: number;
-
-  @Column({
     type: DataType.BOOLEAN,
     allowNull: false,
     defaultValue: false,
