@@ -53,17 +53,27 @@ export class JobApplicationController {
   @ApiResponse({ status: 201, description: 'Application submitted successfully' })
   async create(@Request() req, @Body() createJobApplicationDto: CreateJobApplicationDto) {
     try {
-      // Check if user has paid and has available application slots
-      const { canApply, remainingApplications } = await this.candidatePaymentService.checkApplicationLimit(req.user.sub);
+      // First check: Candidate daily application limit (payment-based)
+      const { canApply: candidateCanApply, remainingApplications } = await this.candidatePaymentService.checkApplicationLimit(req.user.sub);
       
-      if (!canApply) {
-        throw new BadRequestException('You need to make a payment or have reached your daily application limit');
+      if (!candidateCanApply) {
+        // Get candidate payment stats for better error message
+        const paymentStats = await this.candidatePaymentService.getUserPaymentStats(req.user.sub);
+        
+        if (!paymentStats.hasPaid) {
+          throw new BadRequestException('You need to purchase a candidate application plan to apply for jobs. Please visit the pricing page to select a plan.');
+        } else {
+          throw new BadRequestException(`You have reached your daily application limit of ${paymentStats.dailyLimit} applications. Your limit will reset tomorrow.`);
+        }
       }
+
+      // Second check: Job-specific application limit (employer's subscription-based)
+      // This is handled inside the jobApplicationService.create method
       
-      // Create the application
+      // Create the application (this will check job-specific limits)
       const application = await this.jobApplicationService.create(req.user.sub, createJobApplicationDto);
       
-      // Increment application count
+      // Increment candidate's daily application count
       await this.candidatePaymentService.incrementApplicationCount(req.user.sub);
       
       return successResponse(
@@ -397,7 +407,7 @@ export class JobApplicationController {
   }
 
   @Get('job/:jobId/can-apply')
-  @ApiOperation({ summary: 'Check if a job can accept more applications' })
+  @ApiOperation({ summary: 'Check if a job can accept more applications (employer limit only)' })
   @ApiResponse({ status: 200, description: 'Job application availability checked successfully' })
   async canJobAcceptMoreApplications(@Param('jobId') jobId: string) {
     try {
@@ -405,6 +415,84 @@ export class JobApplicationController {
       return successResponse(result, 'Job application availability checked successfully');
     } catch (error) {
       console.error('Error checking job application availability:', error.message);
+      throw new BadRequestException(error.message);
+    }
+  }
+
+  @Get('job/:jobId/can-apply-full-check')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Check if current user can apply to a specific job (both candidate and employer limits)' })
+  @ApiResponse({ status: 200, description: 'Full application eligibility checked successfully' })
+  async canUserApplyToJob(@Param('jobId') jobId: string, @Request() req) {
+    try {
+      // Check candidate daily limit
+      const { canApply: candidateCanApply, remainingApplications } = await this.candidatePaymentService.checkApplicationLimit(req.user.sub);
+      const candidatePaymentStats = await this.candidatePaymentService.getUserPaymentStats(req.user.sub);
+      
+      // Check job-specific limit (employer side)
+      const jobLimitResult = await this.jobApplicationService.canJobAcceptMoreApplications(jobId);
+      
+      // Check if user has already applied
+      const existingApplication = await this.jobApplicationService.findAll(
+        req.user.sub,
+        'candidate',
+        'candidate',
+        1,
+        1,
+        undefined
+      );
+      
+      const hasAlreadyApplied = existingApplication.applications.some(app => app.jobId === jobId);
+      
+      // Determine overall eligibility
+      const canApply = candidateCanApply && jobLimitResult.canApply && !hasAlreadyApplied;
+      
+      let blockingReason = null;
+      if (!candidateCanApply) {
+        if (!candidatePaymentStats.hasPaid) {
+          blockingReason = 'CANDIDATE_PAYMENT_REQUIRED';
+        } else {
+          blockingReason = 'CANDIDATE_DAILY_LIMIT_REACHED';
+        }
+      } else if (!jobLimitResult.canApply) {
+        blockingReason = 'JOB_LIMIT_REACHED';
+      } else if (hasAlreadyApplied) {
+        blockingReason = 'ALREADY_APPLIED';
+      }
+      
+      return successResponse({
+        canApply,
+        blockingReason,
+        candidateLimit: {
+          canApply: candidateCanApply,
+          dailyLimit: candidatePaymentStats.dailyLimit,
+          applicationsUsedToday: candidatePaymentStats.applicationsUsedToday,
+          remainingApplications,
+          hasPaid: candidatePaymentStats.hasPaid
+        },
+        jobLimit: jobLimitResult,
+        hasAlreadyApplied
+      }, 'Full application eligibility checked successfully');
+    } catch (error) {
+      console.error('Error checking full application eligibility:', error.message);
+      throw new BadRequestException(error.message);
+    }
+  }
+
+  @Post('test/enable-candidate-applications/:userId')
+  @ApiOperation({ summary: 'Enable candidate applications for testing (Development only)' })
+  @ApiResponse({ status: 200, description: 'Candidate applications enabled successfully' })
+  async enableCandidateApplicationsForTesting(@Param('userId') userId: string) {
+    try {
+      // This is for testing purposes - manually set hasPaid to true
+      await this.candidatePaymentService.manuallyUpdatePaymentStatus(userId, true);
+      return successResponse(
+        { userId, hasPaid: true },
+        'Candidate applications enabled for testing'
+      );
+    } catch (error) {
+      console.error('Error enabling candidate applications:', error.message);
       throw new BadRequestException(error.message);
     }
   }
