@@ -395,4 +395,17 @@ export class JobApplicationController {
       throw new BadRequestException(error.message);
     }
   }
+
+  @Get('job/:jobId/can-apply')
+  @ApiOperation({ summary: 'Check if a job can accept more applications' })
+  @ApiResponse({ status: 200, description: 'Job application availability checked successfully' })
+  async canJobAcceptMoreApplications(@Param('jobId') jobId: string) {
+    try {
+      const result = await this.jobApplicationService.canJobAcceptMoreApplications(jobId);
+      return successResponse(result, 'Job application availability checked successfully');
+    } catch (error) {
+      console.error('Error checking job application availability:', error.message);
+      throw new BadRequestException(error.message);
+    }
+  }
 } 

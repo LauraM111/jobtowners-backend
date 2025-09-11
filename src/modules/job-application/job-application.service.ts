@@ -74,13 +74,51 @@ export class JobApplicationService {
       throw new BadRequestException('You have already applied for this job');
     }
 
-    return this.jobApplicationModel.create({
+    // Check application limit for this specific job
+    await this.checkJobApplicationLimit(createJobApplicationDto.jobId, job.userId);
+
+    // Create the application
+    const application = await this.jobApplicationModel.create({
       applicantId: userId,
       jobId: createJobApplicationDto.jobId,
       resumeId: createJobApplicationDto.resumeId,
       coverLetter: createJobApplicationDto.coverLetter,
       status: JobApplicationStatus.PENDING,
     });
+
+    // Increment the job's application counter
+    await this.jobService.incrementApplicationCount(createJobApplicationDto.jobId);
+
+    return application;
+  }
+
+  /**
+   * Check if a job has reached its application limit
+   */
+  private async checkJobApplicationLimit(jobId: string, employerId: string): Promise<void> {
+    // Get the employer's subscription to find the applicant limit per job
+    const subscriptions = await this.subscriptionService.getUserSubscriptions(employerId);
+    
+    if (!subscriptions || subscriptions.length === 0) {
+      throw new BadRequestException('Employer does not have an active subscription');
+    }
+
+    // Get the highest applicant limit from all active subscriptions
+    const applicantsPerJob = Math.max(...subscriptions.map(sub => sub.plan.resumeViewsCount));
+
+    // Get current application count for this specific job
+    const currentApplicationCount = await this.jobApplicationModel.count({
+      where: {
+        jobId: jobId
+      }
+    });
+
+    console.log(`Job ${jobId}: Current applications: ${currentApplicationCount}, Limit: ${applicantsPerJob}`);
+
+    // Check if the limit has been reached
+    if (currentApplicationCount >= applicantsPerJob) {
+      throw new BadRequestException(`This job has reached its application limit of ${applicantsPerJob} applicants`);
+    }
   }
 
   /**
@@ -278,7 +316,14 @@ export class JobApplicationService {
       throw new ForbiddenException('You do not have permission to delete this application');
     }
 
+    const jobId = jobApplication.jobId;
     await jobApplication.destroy();
+    
+    // Decrement the job's application counter
+    const job = await this.jobModel.findByPk(jobId);
+    if (job && job.applications > 0) {
+      await job.update({ applications: job.applications - 1 });
+    }
   }
 
   async viewResume(applicationId: string, employerId: string): Promise<JobApplication> {
@@ -753,6 +798,63 @@ export class JobApplicationService {
       };
     } catch (error) {
       console.error('Error retrieving application details:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Check if a job can accept more applications
+   */
+  async canJobAcceptMoreApplications(jobId: string): Promise<{ canApply: boolean, currentApplications: number, maxApplications: number, remainingSlots: number }> {
+    try {
+      // Get the job details
+      const job = await this.jobModel.findByPk(jobId, {
+        include: [
+          {
+            model: this.userModel,
+            as: 'user',
+            attributes: ['id']
+          }
+        ]
+      });
+
+      if (!job) {
+        throw new NotFoundException('Job not found');
+      }
+
+      // Get the employer's subscription to find the applicant limit per job
+      const subscriptions = await this.subscriptionService.getUserSubscriptions(job.userId);
+      
+      if (!subscriptions || subscriptions.length === 0) {
+        return {
+          canApply: false,
+          currentApplications: 0,
+          maxApplications: 0,
+          remainingSlots: 0
+        };
+      }
+
+      // Get the highest applicant limit from all active subscriptions
+      const maxApplicationsPerJob = Math.max(...subscriptions.map(sub => sub.plan.resumeViewsCount));
+
+      // Get current application count for this specific job from the JobApplication table
+      const currentApplicationCount = await this.jobApplicationModel.count({
+        where: {
+          jobId: jobId
+        }
+      });
+
+      const remainingSlots = Math.max(0, maxApplicationsPerJob - currentApplicationCount);
+      const canApply = remainingSlots > 0;
+
+      return {
+        canApply,
+        currentApplications: currentApplicationCount,
+        maxApplications: maxApplicationsPerJob,
+        remainingSlots
+      };
+    } catch (error) {
+      console.error('Error checking if job can accept more applications:', error);
       throw error;
     }
   }
