@@ -309,8 +309,7 @@ export class JobApplicationService {
   }
 
   async remove(id: string, userId: string, isAdmin = false): Promise<void> {
-    let jobApplication: JobApplication;
-    git c
+    let jobApplication: JobApplication; 
     if (isAdmin) {
       // For admins, directly find the application without permission checks
       jobApplication = await this.jobApplicationModel.findByPk(id, {
