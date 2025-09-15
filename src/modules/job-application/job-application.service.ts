@@ -309,11 +309,37 @@ export class JobApplicationService {
   }
 
   async remove(id: string, userId: string, isAdmin = false): Promise<void> {
-    const jobApplication = await this.findOne(id, userId, isAdmin);
-    
-    // Only admin or the applicant can delete the application
-    if (!isAdmin && jobApplication.applicantId !== userId) {
-      throw new ForbiddenException('You do not have permission to delete this application');
+    let jobApplication: JobApplication;
+    git c
+    if (isAdmin) {
+      // For admins, directly find the application without permission checks
+      jobApplication = await this.jobApplicationModel.findByPk(id, {
+        include: [
+          { 
+            model: this.resumeModel,
+            attributes: ['id', 'firstName', 'lastName', 'email']
+          },
+          { 
+            model: this.userModel, 
+            as: 'applicant' 
+          },
+          { 
+            model: this.jobModel
+          }
+        ]
+      });
+      
+      if (!jobApplication) {
+        throw new NotFoundException(`Job application with ID ${id} not found`);
+      }
+    } else {
+      // For non-admins, use the existing findOne with permission checks
+      jobApplication = await this.findOne(id, userId, isAdmin);
+      
+      // Only admin or the applicant can delete the application
+      if (jobApplication.applicantId !== userId) {
+        throw new ForbiddenException('You do not have permission to delete this application');
+      }
     }
 
     const jobId = jobApplication.jobId;
