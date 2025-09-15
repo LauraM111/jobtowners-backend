@@ -579,7 +579,7 @@ export class JobService {
     
     await job.destroy();
   }
-
+  
   /**
    * Increment application count
    */
