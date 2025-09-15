@@ -108,10 +108,13 @@ export class JobController {
       
       // Update the job with the new attachments
       const existingAttachments = job.additionalAttachments || [];
+      const isAdmin = req.user.isAdmin || false;
       const updatedJob = await this.jobService.update(
         id, 
         req.user.sub, 
-        { additionalAttachments: [...existingAttachments, ...attachmentUrls] }
+        { additionalAttachments: [...existingAttachments, ...attachmentUrls] },
+        undefined,
+        isAdmin
       );
       
       return successResponse(updatedJob, 'Attachments uploaded successfully');
@@ -395,7 +398,8 @@ export class JobController {
       `);
       
       const attachmentUrl = attachment ? `/uploads/jobs/${attachment.filename}` : null;
-      const job = await this.jobService.update(id, req.user.sub, cleanUpdateDto, attachmentUrl);
+      const isAdmin = req.user.isAdmin || false;
+      const job = await this.jobService.update(id, req.user.sub, cleanUpdateDto, attachmentUrl, isAdmin);
       return successResponse(job, 'Job updated successfully');
     } catch (error) {
       console.error('Error updating job:', error);
@@ -410,7 +414,8 @@ export class JobController {
   @ApiResponse({ status: 200, description: 'Job deleted successfully' })
   async remove(@Request() req, @Param('id') id: string) {
     try {
-      await this.jobService.remove(id, req.user.sub);
+      const isAdmin = req.user.isAdmin || false;
+      await this.jobService.remove(id, req.user.sub, isAdmin);
       return successResponse(null, 'Job deleted successfully');
     } catch (error) {
       throw new BadRequestException(error.message);

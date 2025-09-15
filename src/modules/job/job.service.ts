@@ -506,17 +506,29 @@ export class JobService {
   /**
    * Update a job
    */
-  async update(id: string, userId: string, updateJobDto: UpdateJobDto, attachmentUrl?: string): Promise<Job> {
+  async update(id: string, userId: string, updateJobDto: UpdateJobDto, attachmentUrl?: string, isAdmin = false): Promise<Job> {
     const transaction = await this.sequelize.transaction();
     
     try {
-      const job = await this.jobModel.findOne({
-        where: { id, userId },
-        transaction
-      });
+      let job: Job;
       
-      if (!job) {
-        throw new NotFoundException(`Job with ID ${id} not found or you don't have permission to update it`);
+      if (isAdmin) {
+        // For admins, find any job with the given ID
+        job = await this.jobModel.findByPk(id, { transaction });
+        
+        if (!job) {
+          throw new NotFoundException(`Job with ID ${id} not found`);
+        }
+      } else {
+        // For non-admins, only find jobs they own
+        job = await this.jobModel.findOne({
+          where: { id, userId },
+          transaction
+        });
+        
+        if (!job) {
+          throw new NotFoundException(`Job with ID ${id} not found or you don't have permission to update it`);
+        }
       }
       
       // Format application deadline date if provided
@@ -544,13 +556,25 @@ export class JobService {
   /**
    * Remove a job
    */
-  async remove(id: string, userId: string): Promise<void> {
-    const job = await this.jobModel.findOne({
-      where: { id, userId }
-    });
+  async remove(id: string, userId: string, isAdmin = false): Promise<void> {
+    let job: Job;
     
-    if (!job) {
-      throw new NotFoundException(`Job with ID ${id} not found or you don't have permission to delete it`);
+    if (isAdmin) {
+      // For admins, find any job with the given ID
+      job = await this.jobModel.findByPk(id);
+      
+      if (!job) {
+        throw new NotFoundException(`Job with ID ${id} not found`);
+      }
+    } else {
+      // For non-admins, only find jobs they own
+      job = await this.jobModel.findOne({
+        where: { id, userId }
+      });
+      
+      if (!job) {
+        throw new NotFoundException(`Job with ID ${id} not found or you don't have permission to delete it`);
+      }
     }
     
     await job.destroy();
