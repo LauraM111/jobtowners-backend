@@ -580,7 +580,7 @@ export class JobService {
     await job.destroy();
   }
   
-  /**
+  /** 
    * Increment application count
    */
   async incrementApplicationCount(id: string): Promise<void> {
