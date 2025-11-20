@@ -14,4 +14,5 @@ export default () => ({
     expiresIn: process.env.JWT_EXPIRES_IN || '1d',
   },
   frontendUrl: process.env.FRONTEND_URL || 'http://localhost:3000',
+  recaptchaSecretKey: process.env.RECAPTCHA_SECRET_KEY,
 }); 

@@ -37,6 +37,7 @@
     "@nestjs/platform-socket.io": "^10.4.17",
     "@nestjs/sequelize": "^10.0.1",
     "@nestjs/swagger": "^7.1.13",
+    "@nestjs/throttler": "^6.4.0",
     "@nestjs/websockets": "^10.4.17",
     "@types/uuid": "^10.0.0",
     "bcrypt": "^5.1.1",

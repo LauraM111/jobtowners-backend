@@ -1,4 +1,5 @@
 import { Body, Controller, Get, Param, Patch, Post, Query, UseGuards } from '@nestjs/common';
+import { Throttle, SkipThrottle } from '@nestjs/throttler';
 import { ContactService } from './contact.service';
 import { ContactFormDto } from './dto/contact.dto';
 import { ContactResponseDto } from './dto/contact-response.dto';
@@ -10,14 +11,18 @@ import { User } from '../auth/decorators/user.decorator';
 
 @ApiTags('Contact')
 @Controller('contact')
+@SkipThrottle() // Skip throttling by default
 export class ContactController {
   constructor(private readonly contactService: ContactService) {}
 
   @Public()
   @Post()
+  @SkipThrottle({ default: false }) // Enable throttling for this endpoint
+  @Throttle({ default: { limit: 5, ttl: 3600000 } }) // 5 requests per hour (3600000ms)
   @ApiOperation({ summary: 'Submit contact form' })
   @ApiResponse({ status: 201, description: 'Contact form submitted successfully' })
   @ApiResponse({ status: 400, description: 'Bad request' })
+  @ApiResponse({ status: 429, description: 'Too many requests. Please try again later.' })
   async submitContactForm(@Body() contactFormDto: ContactFormDto) {
     return this.contactService.processContactForm(contactFormDto);
   }

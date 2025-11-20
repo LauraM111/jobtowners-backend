@@ -1,25 +1,38 @@
-import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
+import { Injectable, NotFoundException, BadRequestException, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { InjectModel } from '@nestjs/sequelize';
 import { ContactFormDto } from './dto/contact.dto';
 import { MailgunService } from '../mailgun/mailgun.service';
 import { ContactSubmission, ContactSubmissionStatus } from './entities/contact-submission.entity';
+import { RecaptchaService } from './recaptcha.service';
 
 @Injectable()
 export class ContactService {
+  private readonly logger = new Logger(ContactService.name);
+
   constructor(
     private readonly mailgunService: MailgunService,
     private readonly configService: ConfigService,
+    private readonly recaptchaService: RecaptchaService,
     @InjectModel(ContactSubmission)
     private contactSubmissionModel: typeof ContactSubmission,
   ) {}
 
   async processContactForm(contactFormDto: ContactFormDto) {
+    // Verify reCAPTCHA token
+    await this.recaptchaService.verifyRecaptcha(contactFormDto.recaptchaToken);
+    
+    // Sanitize inputs (basic XSS prevention)
+    const sanitizedData = this.sanitizeContactData(contactFormDto);
+    
+    // Additional validation - check for suspicious patterns
+    this.validateContactData(sanitizedData);
+    
     const adminEmail = this.configService.get<string>('ADMIN_EMAIL');
     
     // Prepare email content
-    const subject = `Contact Form: ${contactFormDto.subject}`;
-    const html = this.createEmailTemplate(contactFormDto);
+    const subject = `Contact Form: ${sanitizedData.subject}`;
+    const html = this.createEmailTemplate(sanitizedData);
     
     // Send email to admin with user's email as Reply-To
     await this.mailgunService.sendEmail({
@@ -27,22 +40,74 @@ export class ContactService {
       subject,
       html,
       from: `${this.configService.get('MAIL_FROM_NAME')} <${this.configService.get('MAIL_FROM_ADDRESS')}>`,
-      replyTo: `${contactFormDto.name} <${contactFormDto.email}>`, // Set Reply-To to user's email
+      replyTo: `${sanitizedData.name} <${sanitizedData.email}>`, // Set Reply-To to user's email
     });
     
     // Store the submission in the database
     await this.contactSubmissionModel.create({
-      name: contactFormDto.name,
-      email: contactFormDto.email,
-      phoneNumber: contactFormDto.phoneNumber,
-      subject: contactFormDto.subject,
-      message: contactFormDto.message,
+      name: sanitizedData.name,
+      email: sanitizedData.email,
+      phoneNumber: sanitizedData.phoneNumber,
+      subject: sanitizedData.subject,
+      message: sanitizedData.message,
     });
     
     return {
       success: true,
       message: 'Your message has been sent successfully. We will get back to you soon.',
     };
+  }
+
+  /**
+   * Sanitize contact form data to prevent XSS attacks
+   */
+  private sanitizeContactData(contactFormDto: ContactFormDto): ContactFormDto {
+    const sanitize = (str: string): string => {
+      if (!str) return str;
+      return str
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#x27;')
+        .replace(/\//g, '&#x2F;');
+    };
+
+    return {
+      name: sanitize(contactFormDto.name),
+      email: contactFormDto.email.toLowerCase().trim(),
+      phoneNumber: contactFormDto.phoneNumber ? sanitize(contactFormDto.phoneNumber) : undefined,
+      subject: sanitize(contactFormDto.subject),
+      message: sanitize(contactFormDto.message),
+      recaptchaToken: contactFormDto.recaptchaToken,
+    };
+  }
+
+  /**
+   * Validate contact data for suspicious patterns (honeypot check)
+   */
+  private validateContactData(contactFormDto: ContactFormDto): void {
+    // Check for common spam patterns in message
+    const spamPatterns = [
+      /\b(viagra|cialis|poker|casino|lottery)\b/i,
+      /(https?:\/\/.*){5,}/i, // Multiple URLs (5 or more)
+      /\b\d{10,}\b/, // Long number sequences (could be spam)
+    ];
+
+    for (const pattern of spamPatterns) {
+      if (pattern.test(contactFormDto.message)) {
+        this.logger.warn('Suspicious pattern detected in contact form submission');
+        throw new BadRequestException('Your message contains content that appears to be spam.');
+      }
+    }
+
+    // Check message length
+    if (contactFormDto.message.length < 10) {
+      throw new BadRequestException('Message is too short. Please provide more details.');
+    }
+
+    if (contactFormDto.message.length > 5000) {
+      throw new BadRequestException('Message is too long. Please limit your message to 5000 characters.');
+    }
   }
 
   private createEmailTemplate(contactFormDto: ContactFormDto): string {

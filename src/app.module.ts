@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { SequelizeModule } from '@nestjs/sequelize';
+import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
 import { APP_FILTER, APP_GUARD } from '@nestjs/core';
 import { HttpExceptionFilter } from './common/filters/http-exception.filter';
 import { UserModule } from './modules/user/user.module';
@@ -52,6 +53,12 @@ import { ApplicationLimit } from './modules/candidate-payment/entities/applicati
       isGlobal: true,
       load: [configuration],
     }),
+    
+    // Rate limiting
+    ThrottlerModule.forRoot([{
+      ttl: 60000, // 60 seconds default
+      limit: 100, // 100 requests per minute by default
+    }]),
     
     // Database - use the database config with sync disabled
     SequelizeModule.forRootAsync({
@@ -120,6 +127,10 @@ import { ApplicationLimit } from './modules/candidate-payment/entities/applicati
     {
       provide: APP_GUARD,
       useClass: JwtAuthGuard,
+    },
+    {
+      provide: APP_GUARD,
+      useClass: ThrottlerGuard,
     },
     UserSeeder,
     DatabaseInitService,
