@@ -24,10 +24,8 @@ export class ContactService {
     
     // Sanitize inputs (basic XSS prevention)
     const sanitizedData = this.sanitizeContactData(contactFormDto);
-    
     // Additional validation - check for suspicious patterns
     this.validateContactData(sanitizedData);
-    
     const adminEmail = this.configService.get<string>('ADMIN_EMAIL');
     
     // Prepare email content
