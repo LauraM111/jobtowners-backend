@@ -265,4 +265,109 @@ export class MailService {
       throw error;
     }
   }
+
+  /**
+   * Send admin notification for new user registration
+   */
+  async sendAdminRegistrationNotification(user: any, userRole: string): Promise<boolean> {
+    try {
+      const adminEmails = ['laura@jobtowners.com', 'lauram.f.rodriguezg@gmail.com'];
+      const frontendUrl = this.configService.get('FRONTEND_URL') || this.configService.get('frontendUrl');
+      
+      // Determine organization label and name
+      let organizationLabel = 'School / Company';
+      let organizationName = 'Not provided';
+      
+      if (userRole === 'Student') {
+        organizationLabel = 'School';
+        organizationName = user.schoolName || 'Not provided';
+      } else if (userRole === 'Employer') {
+        organizationLabel = 'Company';
+        organizationName = user.companyName || 'Not provided';
+      }
+      
+      const context = {
+        userRole,
+        fullName: `${user.firstName} ${user.lastName}`,
+        email: user.email,
+        phoneNumber: user.phoneNumber || 'Not provided',
+        organizationLabel,
+        organizationName,
+        registrationDate: new Date(user.createdAt).toLocaleString('en-US', {
+          year: 'numeric',
+          month: 'long',
+          day: 'numeric',
+          hour: '2-digit',
+          minute: '2-digit',
+          timeZoneName: 'short'
+        }),
+        profileLink: `${frontendUrl}/admin/users/${user.id}`,
+        hasDocuments: user.studentPermitImage || user.proofOfEnrollmentImage
+      };
+
+      // Send to both admin emails
+      for (const adminEmail of adminEmails) {
+        await this.sendMail({
+          to: adminEmail,
+          subject: `New ${userRole} Registration – Action Required`,
+          template: 'admin-new-registration',
+          context,
+        });
+      }
+
+      this.logger.log(`Admin registration notification sent for user: ${user.email}`);
+      return true;
+    } catch (error) {
+      this.logger.error(`Failed to send admin registration notification: ${error.message}`, error.stack);
+      return false;
+    }
+  }
+
+  /**
+   * Send admin notification for document upload
+   */
+  async sendAdminDocumentUploadNotification(user: any, documentUrls: { studentPermitUrl?: string; enrollmentProofUrl?: string }): Promise<boolean> {
+    try {
+      const adminEmails = ['laura@jobtowners.com', 'lauram.f.rodriguezg@gmail.com'];
+      const frontendUrl = this.configService.get('FRONTEND_URL') || this.configService.get('frontendUrl');
+      
+      // Determine user role display name
+      const userRoleDisplay = user.userType === 'candidate' ? 'Student' : 
+                             user.userType === 'employer' ? 'Employer' : 
+                             user.userType;
+
+      const context = {
+        fullName: `${user.firstName} ${user.lastName}`,
+        userRole: userRoleDisplay,
+        email: user.email,
+        studentPermitUrl: documentUrls.studentPermitUrl,
+        enrollmentProofUrl: documentUrls.enrollmentProofUrl,
+        uploadDate: new Date().toLocaleString('en-US', {
+          year: 'numeric',
+          month: 'long',
+          day: 'numeric',
+          hour: '2-digit',
+          minute: '2-digit',
+          timeZoneName: 'short'
+        }),
+        profileLink: `${frontendUrl}/admin/users/${user.id}`
+      };
+
+      // Send to both admin emails
+      for (const adminEmail of adminEmails) {
+        await this.sendMail({
+          to: adminEmail,
+          subject: '📎 New Document Uploaded – Review Required',
+          template: 'admin-document-upload',
+          context,
+        });
+      }
+
+      this.logger.log(`Admin document upload notification sent for user: ${user.email}`);
+      return true;
+    } catch (error) {
+      this.logger.error(`Failed to send admin document upload notification: ${error.message}`, error.stack);
+      return false;
+    }
+  }
 } 

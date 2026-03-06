@@ -133,6 +133,21 @@ export class UserService {
         this.logger.error(`Failed to send verification email: ${error.message}`);
         // Continue even if email sending fails
       }
+
+      // Send admin notification for new student registration
+      this.mailService.sendAdminRegistrationNotification(user, 'Student').catch(error => {
+        this.logger.error(`Failed to send admin registration notification: ${error.message}`);
+      });
+
+      // Send admin notification for document uploads if documents were provided
+      if (studentPermitUrl || enrollmentProofUrl) {
+        this.mailService.sendAdminDocumentUploadNotification(user, {
+          studentPermitUrl,
+          enrollmentProofUrl
+        }).catch(error => {
+          this.logger.error(`Failed to send admin document upload notification: ${error.message}`);
+        });
+      }
       
       return user;
     } catch (error) {
@@ -188,6 +203,11 @@ export class UserService {
         this.logger.error(`Failed to send verification email: ${error.message}`);
         // Continue even if email sending fails
       }
+
+      // Send admin notification for new employer registration
+      this.mailService.sendAdminRegistrationNotification(user, 'Employer').catch(error => {
+        this.logger.error(`Failed to send admin registration notification: ${error.message}`);
+      });
       
       return user;
     } catch (error) {
@@ -538,9 +558,32 @@ export class UserService {
     if (!hasAtLeastOneDocument) {
       throw new BadRequestException('At least one document (Student Permit or Proof of Enrollment) must be provided');
     }
+
+    // Track if new documents are being uploaded
+    const isUploadingNewDocuments = 
+      (isProvidingStudentPermit && isProvidingStudentPermit !== hasExistingStudentPermit) ||
+      (isProvidingProofOfEnrollment && isProvidingProofOfEnrollment !== hasExistingProofOfEnrollment);
     
     // Update user with provided data
     await user.update(updateCandidateProfileDto);
+    
+    // Send admin notification if new documents were uploaded
+    if (isUploadingNewDocuments) {
+      const updatedUser = await this.findById(userId);
+      const documentUrls: { studentPermitUrl?: string; enrollmentProofUrl?: string } = {};
+      
+      // Only include the newly uploaded documents
+      if (isProvidingStudentPermit && isProvidingStudentPermit !== hasExistingStudentPermit) {
+        documentUrls.studentPermitUrl = isProvidingStudentPermit;
+      }
+      if (isProvidingProofOfEnrollment && isProvidingProofOfEnrollment !== hasExistingProofOfEnrollment) {
+        documentUrls.enrollmentProofUrl = isProvidingProofOfEnrollment;
+      }
+      
+      this.mailService.sendAdminDocumentUploadNotification(updatedUser, documentUrls).catch(error => {
+        this.logger.error(`Failed to send admin document upload notification: ${error.message}`);
+      });
+    }
     
     return this.findById(userId);
   }
