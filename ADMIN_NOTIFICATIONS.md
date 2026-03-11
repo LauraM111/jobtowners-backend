@@ -241,15 +241,27 @@ Ensure these are set in your `.env` file:
 # Mail Configuration
 MAILGUN_SMTP_HOST=smtp.mailgun.org
 MAILGUN_SMTP_PORT=587
-MAILGUN_SMTP_USERNAME=your-username
+MAILGUN_SMTP_USERNAME=your-username@yourdomain.com
 MAILGUN_SMTP_PASSWORD=your-password
-MAIL_FROM=noreply@jobtowners.com
+
+# Mail From Configuration (at least one is required)
+# Option 1: Use separate name and address
 MAIL_FROM_NAME=JobTowners
 MAIL_FROM_ADDRESS=noreply@jobtowners.com
+
+# Option 2: Or use combined MAIL_FROM (deprecated but supported)
+# MAIL_FROM=noreply@jobtowners.com
 
 # Frontend URL (for admin profile links)
 FRONTEND_URL=https://yourdomain.com
 ```
+
+**Note:** The mail service will try to use:
+1. `MAIL_FROM_ADDRESS` (preferred)
+2. `MAIL_FROM` (fallback)
+3. `MAILGUN_SMTP_USERNAME` (last resort)
+
+Make sure at least one of these is properly configured with a valid email address.
 
 ### Template Files
 Templates must be present in:
@@ -293,13 +305,21 @@ Check logs for email sending errors:
 
 1. **Check SMTP Configuration**
    - Verify all MAILGUN_* environment variables are set
+   - Ensure `MAILGUN_SMTP_USERNAME` is a valid email address (e.g., `postmaster@mg.yourdomain.com`)
    - Test SMTP connection manually
 
-2. **Check Logs**
+2. **Check From Address Configuration**
+   - Error: "501 Invalid command or cannot parse from address"
+     - Ensure `MAIL_FROM_ADDRESS` or `MAIL_FROM` is set to a valid email
+     - The system will fallback to `MAILGUN_SMTP_USERNAME` if neither is set
+     - Make sure the address format is: `user@domain.com` (no spaces, valid format)
+
+3. **Check Logs**
    - Look for error messages in application logs
    - Check for "Failed to send" messages
+   - Verify template loading errors
 
-3. **Verify Templates**
+4. **Verify Templates**
    - Ensure templates exist in `dist/templates/emails/`
    - Check template syntax (Handlebars)
 

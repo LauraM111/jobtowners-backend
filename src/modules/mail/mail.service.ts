@@ -61,9 +61,15 @@ export class MailService {
       // Render template with context
       const html = compiledTemplate(options.context);
 
+      // Get from address with proper fallback
+      const fromName = this.configService.get('MAIL_FROM_NAME') || 'JobTowners';
+      const fromAddress = this.configService.get('MAIL_FROM_ADDRESS') || 
+                          this.configService.get('MAIL_FROM') || 
+                          this.configService.get('MAILGUN_SMTP_USERNAME');
+
       // Send email
       await this.transporter.sendMail({
-        from: `"JobTowners" <${this.configService.get('MAIL_FROM')}>`,
+        from: `"${fromName}" <${fromAddress}>`,
         to: options.to,
         subject: options.subject,
         html,
@@ -138,8 +144,14 @@ export class MailService {
   }
 
   async sendTestEmail(to: string): Promise<boolean> {
+    // Get from address with proper fallback
+    const fromName = this.configService.get('MAIL_FROM_NAME') || 'JobTowners';
+    const fromAddress = this.configService.get('MAIL_FROM_ADDRESS') || 
+                        this.configService.get('MAIL_FROM') || 
+                        this.configService.get('MAILGUN_SMTP_USERNAME');
+
     return this.transporter.sendMail({
-      from: `"JobTowners" <${this.configService.get('MAIL_FROM')}>`,
+      from: `"${fromName}" <${fromAddress}>`,
       to: to,
       subject: 'Test Email',
       text: 'This is a test email. If you received this email, the mail service is working correctly.',
@@ -178,8 +190,14 @@ export class MailService {
   }
 
   async sendNotificationEmail(to: string, name: string, message: string, actionUrl?: string): Promise<boolean> {
+    // Get from address with proper fallback
+    const fromName = this.configService.get('MAIL_FROM_NAME') || 'JobTowners';
+    const fromAddress = this.configService.get('MAIL_FROM_ADDRESS') || 
+                        this.configService.get('MAIL_FROM') || 
+                        this.configService.get('MAILGUN_SMTP_USERNAME');
+
     return this.transporter.sendMail({
-      from: `"JobTowners" <${this.configService.get('MAIL_FROM')}>`,
+      from: `"${fromName}" <${fromAddress}>`,
       to: to,
       subject: 'New Notification',
       text: message,
