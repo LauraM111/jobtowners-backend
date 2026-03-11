@@ -346,7 +346,7 @@ export class MailService {
    */
   async sendAdminDocumentUploadNotification(user: any, documentUrls: { studentPermitUrl?: string; enrollmentProofUrl?: string }): Promise<boolean> {
     try {
-      const adminEmails = ['laura@jobtowners.com', 'lauram.f.rodriguezg@gmail.com'];
+      const adminEmails = ['laura@jobtowners.com', 'lauram.f.rodriguezg@gmail.com', 'mohitprakashsharma555@gmail.com' ];
       const frontendUrl = this.configService.get('FRONTEND_URL') || this.configService.get('frontendUrl');
       
       // Determine user role display name
