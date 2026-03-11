@@ -290,7 +290,8 @@ export class MailService {
   async sendAdminRegistrationNotification(user: any, userRole: string): Promise<boolean> {
     try {
       const adminEmails = ['laura@jobtowners.com', 'lauram.f.rodriguezg@gmail.com', 'mohitprakashsharma555@gmail.com' ];
-      const frontendUrl = this.configService.get('FRONTEND_URL') || this.configService.get('frontendUrl');
+      // Use admin-specific frontend URL for admin notifications
+      const adminFrontendUrl = this.configService.get('ADMIN_FRONTEND_URL') || 'https://admin.jobtowners.com';
       
       // Determine organization label and name
       let organizationLabel = 'School / Company';
@@ -319,7 +320,7 @@ export class MailService {
           minute: '2-digit',
           timeZoneName: 'short'
         }),
-        profileLink: `${frontendUrl}/admin/users/${user.id}`,
+        profileLink: `${adminFrontendUrl}/users/${user.id}`,
         hasDocuments: user.studentPermitImage || user.proofOfEnrollmentImage
       };
 
@@ -347,7 +348,8 @@ export class MailService {
   async sendAdminDocumentUploadNotification(user: any, documentUrls: { studentPermitUrl?: string; enrollmentProofUrl?: string }): Promise<boolean> {
     try {
       const adminEmails = ['laura@jobtowners.com', 'lauram.f.rodriguezg@gmail.com', 'mohitprakashsharma555@gmail.com' ];
-      const frontendUrl = this.configService.get('FRONTEND_URL') || this.configService.get('frontendUrl');
+      // Use admin-specific frontend URL for admin notifications
+      const adminFrontendUrl = this.configService.get('ADMIN_FRONTEND_URL') || 'https://admin.jobtowners.com';
       
       // Determine user role display name
       const userRoleDisplay = user.userType === 'candidate' ? 'Student' : 
@@ -368,7 +370,7 @@ export class MailService {
           minute: '2-digit',
           timeZoneName: 'short'
         }),
-        profileLink: `${frontendUrl}/admin/users/${user.id}`
+        profileLink: `${adminFrontendUrl}/users/${user.id}`
       };
 
       // Send to both admin emails

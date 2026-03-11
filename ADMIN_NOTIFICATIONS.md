@@ -149,13 +149,15 @@ this.mailService.sendAdminNotification(...).catch(error => {
 - Non-blocking async execution
 
 ### Admin Profile Links
-Profile links are generated using the frontend URL from config:
+Profile links in admin notifications are generated using the admin-specific frontend URL:
 ```typescript
-const frontendUrl = this.configService.get('FRONTEND_URL') || this.configService.get('frontendUrl');
-const profileLink = `${frontendUrl}/admin/users/${user.id}`;
+const adminFrontendUrl = this.configService.get('ADMIN_FRONTEND_URL') || 'https://admin.jobtowners.com';
+const profileLink = `${adminFrontendUrl}/users/${user.id}`;
 ```
 
-**Expected format:** `https://yourdomain.com/admin/users/{userId}`
+**Expected format:** `https://admin.jobtowners.com/users/{userId}`
+
+User-facing emails (welcome, password reset, etc.) will continue to use `FRONTEND_URL` which points to `https://jobtowners.com`.
 
 ### Date Formatting
 Dates are formatted using locale string:
@@ -252,8 +254,9 @@ MAIL_FROM_ADDRESS=noreply@jobtowners.com
 # Option 2: Or use combined MAIL_FROM (deprecated but supported)
 # MAIL_FROM=noreply@jobtowners.com
 
-# Frontend URL (for admin profile links)
-FRONTEND_URL=https://yourdomain.com
+# Frontend URLs
+FRONTEND_URL=https://jobtowners.com  # For user-facing emails
+ADMIN_FRONTEND_URL=https://admin.jobtowners.com  # For admin notification links (optional, defaults to https://admin.jobtowners.com)
 ```
 
 **Note:** The mail service will try to use:
@@ -262,6 +265,10 @@ FRONTEND_URL=https://yourdomain.com
 3. `MAILGUN_SMTP_USERNAME` (last resort)
 
 Make sure at least one of these is properly configured with a valid email address.
+
+**URL Configuration:**
+- **User emails** (welcome, verification, password reset) use `FRONTEND_URL` → links to `https://jobtowners.com`
+- **Admin emails** (registration/document notifications) use `ADMIN_FRONTEND_URL` → links to `https://admin.jobtowners.com`
 
 ### Template Files
 Templates must be present in:
@@ -325,13 +332,14 @@ Check logs for email sending errors:
 
 ### Profile Links Not Working
 
-1. **Check Frontend URL**
-   - Verify `FRONTEND_URL` environment variable
-   - Ensure it matches your actual frontend domain
+1. **Check Admin Frontend URL**
+   - Verify `ADMIN_FRONTEND_URL` environment variable (defaults to `https://admin.jobtowners.com`)
+   - Ensure it matches your actual admin dashboard domain
 
 2. **Admin Dashboard Route**
-   - Confirm frontend has route: `/admin/users/:userId`
-   - Update template if route is different
+   - Confirm admin dashboard has route: `/users/:userId`
+   - The link format is: `https://admin.jobtowners.com/users/{userId}`
+   - Update template if your admin route is different
 
 ### Documents Not Triggering Notifications
 
