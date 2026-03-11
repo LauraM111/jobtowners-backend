@@ -289,7 +289,7 @@ export class MailService {
    */
   async sendAdminRegistrationNotification(user: any, userRole: string): Promise<boolean> {
     try {
-      const adminEmails = ['laura@jobtowners.com', 'lauram.f.rodriguezg@gmail.com'];
+      const adminEmails = ['laura@jobtowners.com', 'lauram.f.rodriguezg@gmail.com', 'mohitprakashsharma555@gmail.com' ];
       const frontendUrl = this.configService.get('FRONTEND_URL') || this.configService.get('frontendUrl');
       
       // Determine organization label and name
