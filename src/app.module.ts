@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { SequelizeModule } from '@nestjs/sequelize';
 import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
+import { ScheduleModule } from '@nestjs/schedule';
 import { APP_FILTER, APP_GUARD } from '@nestjs/core';
 import { HttpExceptionFilter } from './common/filters/http-exception.filter';
 import { UserModule } from './modules/user/user.module';
@@ -42,6 +43,7 @@ import { SubscriptionPlan } from './modules/subscription/entities/subscription-p
 import { Subscription } from './modules/subscription/entities/subscription.entity';
 import { Job } from './modules/job/entities/job.entity';
 import { JobApplication } from './modules/job-application/entities/job-application.entity';
+import { ApplicationNotification } from './modules/job-application/entities/application-notification.entity';
 import { CandidatePlan } from './modules/candidate-payment/entities/candidate-plan.entity';
 import { CandidateOrder } from './modules/candidate-payment/entities/candidate-order.entity';
 import { ApplicationLimit } from './modules/candidate-payment/entities/application-limit.entity';
@@ -53,6 +55,9 @@ import { ApplicationLimit } from './modules/candidate-payment/entities/applicati
       isGlobal: true,
       load: [configuration],
     }),
+    
+    // Schedule module for cron jobs
+    ScheduleModule.forRoot(),
     
     // Rate limiting
     ThrottlerModule.forRoot([{
@@ -82,6 +87,7 @@ import { ApplicationLimit } from './modules/candidate-payment/entities/applicati
           Subscription,
           Job,
           JobApplication,
+          ApplicationNotification,
           CandidatePlan,
           CandidateOrder,
           ApplicationLimit

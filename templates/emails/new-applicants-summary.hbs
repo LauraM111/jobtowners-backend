@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>New Applicants</title>
+    <style>
+        body {
+            font-family: 'Helvetica Neue', Arial, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            background-color: #f4f4f4;
+            margin: 0;
+            padding: 0;
+        }
+        .container {
+            max-width: 600px;
+            margin: 20px auto;
+            background-color: #ffffff;
+            border-radius: 8px;
+            overflow: hidden;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 30px 20px;
+            text-align: center;
+        }
+        .header h1 {
+            margin: 0;
+            font-size: 24px;
+            font-weight: 600;
+        }
+        .content {
+            padding: 30px 20px;
+        }
+        .summary-box {
+            background-color: #f8f9fa;
+            border-left: 4px solid #667eea;
+            padding: 20px;
+            margin: 20px 0;
+            border-radius: 4px;
+        }
+        .summary-number {
+            font-size: 36px;
+            font-weight: 700;
+            color: #667eea;
+            margin: 0;
+        }
+        .summary-text {
+            font-size: 16px;
+            color: #6c757d;
+            margin: 5px 0 0 0;
+        }
+        .job-list {
+            margin: 20px 0;
+        }
+        .job-item {
+            background-color: #ffffff;
+            border: 1px solid #e9ecef;
+            border-radius: 6px;
+            padding: 15px;
+            margin-bottom: 15px;
+        }
+        .job-title {
+            font-size: 16px;
+            font-weight: 600;
+            color: #333;
+            margin: 0 0 5px 0;
+        }
+        .job-applicants {
+            font-size: 14px;
+            color: #667eea;
+            font-weight: 500;
+        }
+        .cta-button {
+            display: inline-block;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            text-decoration: none;
+            padding: 12px 30px;
+            border-radius: 25px;
+            font-weight: 600;
+            margin: 20px 0;
+            text-align: center;
+        }
+        .footer {
+            background-color: #f8f9fa;
+            padding: 20px;
+            text-align: center;
+            font-size: 12px;
+            color: #6c757d;
+        }
+        .divider {
+            height: 1px;
+            background-color: #e9ecef;
+            margin: 20px 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>📬 New Job Applications</h1>
+        </div>
+        
+        <div class="content">
+            <p>Hello {{employerName}},</p>
+            
+            <p>Great news! You have received new applications for your job postings.</p>
+            
+            <div class="summary-box">
+                <p class="summary-number">{{totalNewApplicants}}</p>
+                <p class="summary-text">new {{#if (eq totalNewApplicants 1)}}applicant{{else}}applicants{{/if}} since your last notification</p>
+            </div>
+
+            {{#if jobs}}
+            <div class="job-list">
+                <h3 style="color: #333; font-size: 18px; margin-bottom: 15px;">Applications by Job:</h3>
+                {{#each jobs}}
+                <div class="job-item">
+                    <p class="job-title">{{this.jobTitle}}</p>
+                    <p class="job-applicants">{{this.newApplicants}} new {{#if (eq this.newApplicants 1)}}applicant{{else}}applicants{{/if}}</p>
+                </div>
+                {{/each}}
+            </div>
+            {{/if}}
+
+            <div style="text-align: center;">
+                <a href="{{dashboardUrl}}" class="cta-button">View All Applications</a>
+            </div>
+
+            <div class="divider"></div>
+
+            <p style="color: #6c757d; font-size: 14px;">
+                You're receiving this email because you have active job postings on JobTowners. We check for new applications every few hours and send you a summary when there are new applicants.
+            </p>
+        </div>
+        
+        <div class="footer">
+            <p>© {{year}} JobTowners. All rights reserved.</p>
+            <p>This is an automated notification email.</p>
+        </div>
+    </div>
+</body>
+</html>

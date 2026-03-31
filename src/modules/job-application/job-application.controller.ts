@@ -16,6 +16,7 @@ import { UpdateStatusDto } from './dto/update-status.dto';
 import { JobService } from '../job/job.service';
 import { UserType } from '../user/entities/user.entity';
 import { Op } from 'sequelize';
+import { ApplicationNotificationService } from './application-notification.service';
 
 @Controller('job-applications')
 export class JobApplicationController {
@@ -23,6 +24,7 @@ export class JobApplicationController {
     private readonly jobApplicationService: JobApplicationService,
     private readonly candidatePaymentService: CandidatePaymentService,
     private readonly jobService: JobService,
+    private readonly applicationNotificationService: ApplicationNotificationService,
   ) {}
 
   @Get('employer-applicants')

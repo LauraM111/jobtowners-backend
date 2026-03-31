@@ -390,4 +390,37 @@ export class MailService {
       return false;
     }
   }
+
+  /**
+   * Send new applicants summary email to employer
+   */
+  async sendNewApplicantsSummaryEmail(employer: any, applicationsSummary: { totalNewApplicants: number, jobs: { jobTitle: string, newApplicants: number }[] }): Promise<boolean> {
+    try {
+      const employerFrontendUrl = this.configService.get('EMPLOYER_FRONTEND_URL') || 'https://employer.jobtowners.com';
+      
+      const context = {
+        employerName: employer.firstName,
+        totalNewApplicants: applicationsSummary.totalNewApplicants,
+        jobs: applicationsSummary.jobs,
+        dashboardUrl: `${employerFrontendUrl}/applications`,
+        year: new Date().getFullYear()
+      };
+
+      const result = await this.sendMail({
+        to: employer.email,
+        subject: `You have ${applicationsSummary.totalNewApplicants} new ${applicationsSummary.totalNewApplicants === 1 ? 'applicant' : 'applicants'}`,
+        template: 'new-applicants-summary',
+        context,
+      });
+
+      if (result) {
+        this.logger.log(`New applicants summary email sent to employer: ${employer.email}`);
+      }
+      
+      return result;
+    } catch (error) {
+      this.logger.error(`Failed to send new applicants summary email: ${error.message}`, error.stack);
+      return false;
+    }
+  }
 } 
