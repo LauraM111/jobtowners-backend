@@ -498,4 +498,36 @@ export class JobApplicationController {
       throw new BadRequestException(error.message);
     }
   }
+
+  @Post('test/trigger-notification-check')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Manually trigger notification check for current employer (Testing)' })
+  @ApiResponse({ status: 200, description: 'Notification check triggered successfully' })
+  async triggerNotificationCheck(@Request() req) {
+    try {
+      const userId = req.user.sub;
+      const result = await this.applicationNotificationService.triggerNotificationCheckForEmployer(userId);
+      return successResponse(result, result.message);
+    } catch (error) {
+      console.error('Error triggering notification check:', error.message);
+      throw new BadRequestException(error.message);
+    }
+  }
+
+  @Post('test/trigger-all-notifications')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('admin')
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Manually trigger notification check for all employers (Admin only)' })
+  @ApiResponse({ status: 200, description: 'Notification check triggered for all employers' })
+  async triggerAllNotifications() {
+    try {
+      await this.applicationNotificationService.checkForNewApplications();
+      return successResponse({}, 'Notification check triggered for all employers successfully');
+    } catch (error) {
+      console.error('Error triggering all notifications:', error.message);
+      throw new BadRequestException(error.message);
+    }
+  }
 } 

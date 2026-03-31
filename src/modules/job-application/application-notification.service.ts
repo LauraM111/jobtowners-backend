@@ -25,8 +25,8 @@ export class ApplicationNotificationService {
   ) {}
 
   /**
-   * Scheduled job that runs every 2-3 hours to check for new applications
-   * Cron expression: "0 */2 * * *" means every 2 hours
+   * Scheduled job that runs every 2 hours to check for new applications
+   * Cron: At minute 0 past every 2nd hour
    */
   @Cron('0 */2 * * *', {
     name: 'check-new-applications',
