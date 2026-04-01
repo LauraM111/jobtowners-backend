@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>New Application Received</title>
+    <style>
+        body {
+            font-family: 'Helvetica Neue', Arial, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            background-color: #f4f4f4;
+            margin: 0;
+            padding: 0;
+        }
+        .container {
+            max-width: 600px;
+            margin: 20px auto;
+            background-color: #ffffff;
+            border-radius: 8px;
+            overflow: hidden;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 30px 20px;
+            text-align: center;
+        }
+        .header h1 {
+            margin: 0;
+            font-size: 24px;
+            font-weight: 600;
+        }
+        .header-icon {
+            font-size: 48px;
+            margin-bottom: 10px;
+        }
+        .content {
+            padding: 30px 20px;
+        }
+        .notification-box {
+            background-color: #f0f7ff;
+            border-left: 4px solid #667eea;
+            padding: 20px;
+            margin: 20px 0;
+            border-radius: 4px;
+        }
+        .job-title {
+            font-size: 20px;
+            font-weight: 700;
+            color: #667eea;
+            margin: 0 0 10px 0;
+        }
+        .applicant-name {
+            font-size: 16px;
+            color: #333;
+            margin: 5px 0;
+        }
+        .applicant-label {
+            font-size: 14px;
+            color: #6c757d;
+            margin: 0;
+        }
+        .cta-button {
+            display: inline-block;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            text-decoration: none;
+            padding: 14px 35px;
+            border-radius: 25px;
+            font-weight: 600;
+            margin: 20px 0;
+            text-align: center;
+            font-size: 16px;
+        }
+        .cta-button:hover {
+            opacity: 0.9;
+        }
+        .button-container {
+            text-align: center;
+            margin: 30px 0;
+        }
+        .footer {
+            background-color: #f8f9fa;
+            padding: 20px;
+            text-align: center;
+            font-size: 12px;
+            color: #6c757d;
+        }
+        .divider {
+            height: 1px;
+            background-color: #e9ecef;
+            margin: 20px 0;
+        }
+        .highlight {
+            color: #667eea;
+            font-weight: 600;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <div class="header-icon">🎉</div>
+            <h1>New Application Received!</h1>
+        </div>
+        
+        <div class="content">
+            <p>Hello {{employerName}},</p>
+            
+            <p>Great news! You've just received a new application for one of your job postings.</p>
+            
+            <div class="notification-box">
+                <p class="job-title">{{jobTitle}}</p>
+                <p class="applicant-label">New applicant:</p>
+                <p class="applicant-name"><strong>{{applicantName}}</strong></p>
+            </div>
+
+            <p>The candidate has submitted their application and is waiting to hear from you. We recommend reviewing their profile and resume as soon as possible to maintain a positive candidate experience.</p>
+
+            <div class="button-container">
+                <a href="{{dashboardUrl}}" class="cta-button">View Application</a>
+            </div>
+
+            <div class="divider"></div>
+
+            <p style="color: #6c757d; font-size: 14px;">
+                💡 <strong>Tip:</strong> Candidates who receive prompt responses are more likely to remain engaged and accept offers. Consider reviewing applications within 24-48 hours for the best results.
+            </p>
+
+            <div class="divider"></div>
+
+            <p style="color: #6c757d; font-size: 13px;">
+                You're receiving this email because you have active job postings on JobTowners. You will receive an instant notification each time someone applies to your jobs. Additionally, we send you a summary of all applications every couple of hours.
+            </p>
+        </div>
+        
+        <div class="footer">
+            <p>© {{year}} JobTowners. All rights reserved.</p>
+            <p>This is an automated notification email.</p>
+        </div>
+    </div>
+</body>
+</html>
