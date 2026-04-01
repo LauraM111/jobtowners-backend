@@ -9,6 +9,7 @@ import { JobService } from '../job/job.service';
 import { ResumeService } from '../resume/resume.service';
 import { UserService } from '../user/user.service';
 import { SubscriptionService } from '../subscription/subscription.service';
+import { MailService } from '../mail/mail.service';
 import { User, UserType } from '../user/entities/user.entity';
 import { Resume } from '../resume/entities/resume.entity';
 import { Job } from '../job/entities/job.entity';
@@ -25,6 +26,7 @@ export class JobApplicationService {
     private resumeService: ResumeService,
     private userService: UserService,
     private subscriptionService: SubscriptionService,
+    private mailService: MailService,
     @InjectModel(User)
     private userModel: typeof User,
     @InjectModel(Resume)
@@ -89,7 +91,50 @@ export class JobApplicationService {
     // Increment the job's application counter
     await this.jobService.incrementApplicationCount(createJobApplicationDto.jobId);
 
+    // Send immediate notification to employer
+    await this.sendImmediateNotificationToEmployer(application, job, resume);
+
     return application;
+  }
+
+  /**
+   * Send immediate notification to employer when a new application is received
+   */
+  private async sendImmediateNotificationToEmployer(
+    application: JobApplication,
+    job: Job,
+    resume: Resume
+  ): Promise<void> {
+    try {
+      // Get the employer details
+      const employer = await this.userModel.findByPk(job.userId);
+      
+      if (!employer) {
+        console.error('Employer not found for job:', job.id);
+        return;
+      }
+
+      // Get applicant details
+      const applicant = await this.userModel.findByPk(application.applicantId);
+      
+      if (!applicant) {
+        console.error('Applicant not found:', application.applicantId);
+        return;
+      }
+
+      // Send email notification
+      await this.mailService.sendNewApplicationNotification(
+        employer,
+        applicant,
+        job,
+        resume
+      );
+
+      console.log(`Immediate notification sent to employer: ${employer.email} for new application to job: ${job.jobTitle}`);
+    } catch (error) {
+      // Log error but don't throw - we don't want to fail the application creation if email fails
+      console.error('Error sending immediate notification to employer:', error.message);
+    }
   }
 
   /**

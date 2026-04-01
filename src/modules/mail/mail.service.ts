@@ -423,4 +423,37 @@ export class MailService {
       return false;
     }
   }
+
+  /**
+   * Send immediate notification to employer when someone applies
+   */
+  async sendNewApplicationNotification(employer: any, applicant: any, job: any, resume: any): Promise<boolean> {
+    try {
+      const employerFrontendUrl = this.configService.get('EMPLOYER_FRONTEND_URL') || 'https://employer.jobtowners.com';
+      
+      const context = {
+        employerName: employer.firstName,
+        applicantName: `${applicant.firstName} ${applicant.lastName}`,
+        jobTitle: job.jobTitle || job.title,
+        dashboardUrl: `${employerFrontendUrl}/applications`,
+        year: new Date().getFullYear()
+      };
+
+      const result = await this.sendMail({
+        to: employer.email,
+        subject: `New application received for ${job.jobTitle || job.title}`,
+        template: 'new-application-instant',
+        context,
+      });
+
+      if (result) {
+        this.logger.log(`Immediate application notification sent to employer: ${employer.email}`);
+      }
+      
+      return result;
+    } catch (error) {
+      this.logger.error(`Failed to send immediate application notification: ${error.message}`, error.stack);
+      return false;
+    }
+  }
 } 
